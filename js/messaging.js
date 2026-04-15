@@ -1,4 +1,4 @@
-// TR-GOZU Mesajlaşma Modülü
+// TR-GÖZÜ Mesajlaşma Modülü
 
 let messagingOpen = false;
 let currentThread = null;
@@ -11,7 +11,9 @@ function toggleMessaging() {
     if (messagingOpen) {
         panel.classList.remove('hidden');
         loadInbox();
-        STATE.unreadMessages = 0;
+        if (window.STATE) {
+            window.STATE.unreadMessages = 0;
+        }
         updateUnreadBadge();
     } else {
         panel.classList.add('hidden');
@@ -34,7 +36,7 @@ function loadInbox() {
         <div class="inbox-item" onclick="openThread('${thread.id}')">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <strong style="font-size: 13px;">${escapeHtml(thread.participant)}</strong>
-                <span style="font-size: 10px; color: var(--text-dim);">${timeSince(thread.lastMessageTime)}</span>
+                <span style="font-size: 10px; color: var(--text-dim);">${typeof timeSince === 'function' ? timeSince(thread.lastMessageTime) : thread.lastMessageTime}</span>
             </div>
             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                 ${escapeHtml(thread.lastMessage || '')}
@@ -81,7 +83,7 @@ function loadThreadMessages(threadId) {
     container.innerHTML = messages.map(msg => `
         <div class="msg-bubble ${msg.from === email ? 'msg-sent' : 'msg-received'}">
             ${escapeHtml(msg.text)}
-            <div style="font-size: 9px; opacity: 0.7; margin-top: 4px;">${formatTime(msg.time)}</div>
+            <div style="font-size: 9px; opacity: 0.7; margin-top: 4px;">${typeof formatTime === 'function' ? formatTime(msg.time) : msg.time}</div>
         </div>
     `).join('');
 
@@ -107,17 +109,19 @@ function startNewMessage() {
     document.getElementById('newMessageModal').classList.remove('hidden');
 }
 
-// Yeni mesaj modalı kapat
+// Yeni mesaj modal kapat
 function closeNewMessageModal() {
     document.getElementById('newMessageModal').classList.add('hidden');
-    document.getElementById('newMsgRecipient').value = '';
-    document.getElementById('newMsgContent').value = '';
+    const recipientInput = document.getElementById('newMsgRecipient');
+    const contentInput = document.getElementById('newMsgContent');
+    if (recipientInput) recipientInput.value = '';
+    if (contentInput) contentInput.value = '';
 }
 
 // Yeni mesaj gönder (yeni thread)
 function sendNewMessage() {
-    const recipient = document.getElementById('newMsgRecipient').value.trim().toLowerCase();
-    const text = document.getElementById('newMsgContent').value.trim();
+    const recipient = document.getElementById('newMsgRecipient')?.value.trim().toLowerCase();
+    const text = document.getElementById('newMsgContent')?.value.trim();
     const email = getCurrentUserEmail();
 
     if (!recipient || !text) {
@@ -132,35 +136,36 @@ function sendNewMessage() {
 
     // Thread oluştur
     const threadId = generateId();
+    const now = new Date().toISOString();
     const thread = {
         id: threadId,
         participant: recipient,
         lastMessage: text,
-        lastMessageTime: new Date().toISOString()
+        lastMessageTime: now
     };
 
-    // Gönderen thread'i kaydet
+    // Gönderen thread'ini kaydet
     const senderThreads = getMessageThreads();
     senderThreads.unshift(thread);
     saveToStorage(`threads_${email}`, senderThreads);
 
-    // Alıcı thread'i kaydet (karşı tarafta da görünsün)
+    // Alıcı thread'ini kaydet (karşı tarafta da görünsün)
     const recipientThreads = getFromStorage(`threads_${recipient}`, []);
     recipientThreads.unshift({
         id: threadId,
         participant: email,
         lastMessage: text,
-        lastMessageTime: new Date().toISOString()
+        lastMessageTime: now
     });
     saveToStorage(`threads_${recipient}`, recipientThreads);
 
-    // Mesajı kaydet
+    // Mesaj kaydet
     const messages = getThreadMessages(threadId);
     messages.push({
         from: email,
         to: recipient,
         text: text,
-        time: new Date().toISOString()
+        time: now
     });
     saveToStorage(`messages_${email}_${threadId}`, messages);
     saveToStorage(`messages_${recipient}_${threadId}`, messages);
@@ -174,7 +179,7 @@ function sendNewMessage() {
 // Doğrudan mesaj gönder
 function sendDirectMessage() {
     const input = document.getElementById('dmInput');
-    const text = input.value.trim();
+    const text = input?.value.trim();
     const email = getCurrentUserEmail();
 
     if (!text || !currentThread) return;
@@ -183,23 +188,25 @@ function sendDirectMessage() {
     const thread = threads.find(t => t.id === currentThread);
     if (!thread) return;
 
-    // Mesajı kaydet
+    const now = new Date().toISOString();
+
+    // Mesaj kaydet
     const messages = getThreadMessages(currentThread);
     messages.push({
         from: email,
         to: thread.participant,
         text: text,
-        time: new Date().toISOString()
+        time: now
     });
     saveToStorage(`messages_${email}_${currentThread}`, messages);
     saveToStorage(`messages_${thread.participant}_${currentThread}`, messages);
 
     // Thread'i güncelle
     thread.lastMessage = text;
-    thread.lastMessageTime = new Date().toISOString();
+    thread.lastMessageTime = now;
     saveToStorage(`threads_${email}`, threads);
 
-    input.value = '';
+    if (input) input.value = '';
     loadThreadMessages(currentThread);
 }
 
@@ -228,8 +235,9 @@ function updateUnreadBadge() {
     const badge = document.getElementById('msgUnreadBadge');
     if (!badge) return;
 
-    if (STATE.unreadMessages > 0) {
-        badge.textContent = STATE.unreadMessages > 9 ? '9+' : STATE.unreadMessages;
+    const unreadCount = window.STATE?.unreadMessages || 0;
+    if (unreadCount > 0) {
+        badge.textContent = unreadCount > 9 ? '9+' : unreadCount;
         badge.classList.remove('hidden');
     } else {
         badge.classList.add('hidden');
@@ -250,12 +258,12 @@ function loadRegionChat() {
     const container = document.getElementById('regionChatMessages');
     if (!container) return;
 
-    if (!STATE.currentLocation) {
+    if (!window.STATE?.currentLocation) {
         container.innerHTML = '<p style="color:var(--text-dim);font-size:11px;text-align:center;padding:20px">Bölge sohbeti için konumunuzu aktif edin.</p>';
         return;
     }
 
-    const key = getRegionKey(STATE.currentLocation.lat, STATE.currentLocation.lng);
+    const key = getRegionKey(window.STATE.currentLocation.lat, window.STATE.currentLocation.lng);
     const messages = getFromStorage(key, []);
 
     if (messages.length === 0) {
@@ -266,23 +274,23 @@ function loadRegionChat() {
     const email = getCurrentUserEmail();
     container.innerHTML = messages.slice(-50).map(m => `
         <div class="msg-bubble ${m.from === email ? 'msg-sent' : 'msg-received'}">
-            <div style="font-size:9px;opacity:0.6;margin-bottom:2px">${m.from === email ? 'Siz' : m.from.split('@')[0]}</div>
+            <div style="font-size:9px;opacity:0.6;margin-bottom:2px">${m.from === email ? 'Siz' : (m.from ? m.from.split('@')[0] : 'Misafir')}</div>
             ${escapeHtml(m.text)}
-            <div style="font-size:9px;opacity:0.6;margin-top:3px">${formatTime(m.time)}</div>
+            <div style="font-size:9px;opacity:0.6;margin-top:3px">${typeof formatTime === 'function' ? formatTime(m.time) : m.time}</div>
         </div>
     `).join('');
 
     container.scrollTop = container.scrollHeight;
 }
 
-// Bölge mesajı gönder
+// Bölge mesaj gönder
 function sendRegionMessage() {
     const input = document.getElementById('regionChatInput');
     if (!input) return;
     const text = input.value.trim();
     if (!text) return;
 
-    if (!STATE.currentLocation) {
+    if (!window.STATE?.currentLocation) {
         showToast('Bölge sohbeti için konumunuzu aktif edin!');
         return;
     }
@@ -293,15 +301,15 @@ function sendRegionMessage() {
         return;
     }
 
-    const key = getRegionKey(STATE.currentLocation.lat, STATE.currentLocation.lng);
+    const key = getRegionKey(window.STATE.currentLocation.lat, window.STATE.currentLocation.lng);
     const messages = getFromStorage(key, []);
 
     messages.push({
         from: email,
         text,
         time: new Date().toISOString(),
-        lat: STATE.currentLocation.lat,
-        lng: STATE.currentLocation.lng
+        lat: window.STATE.currentLocation.lat,
+        lng: window.STATE.currentLocation.lng
     });
 
     // Son 100 mesajı sakla
@@ -321,19 +329,19 @@ function handleRegionChatKeydown(event) {
 
 // Bölge mesajlaşması (yakın kullanıcılar arası)
 function getNearbyUsersMessageGroup() {
-    if (!STATE.currentLocation) return null;
+    if (!window.STATE?.currentLocation) return null;
 
-    const citizens = getCitizens();
+    const citizens = typeof getCitizens === 'function' ? getCitizens() : [];
     const nearby = citizens.filter(c => {
         if (!c.lat || !c.lng || c.email === getCurrentUserEmail()) return false;
-        const dist = calculateDistance(
-            STATE.currentLocation.lat, STATE.currentLocation.lng,
+        const dist = typeof calculateDistance === 'function' ? calculateDistance(
+            window.STATE.currentLocation.lat, window.STATE.currentLocation.lng,
             c.lat, c.lng
-        );
+        ) : 999;
         return dist <= 5;
     });
 
-    return { location: STATE.currentLocation, users: nearby };
+    return { location: window.STATE.currentLocation, users: nearby };
 }
 
 // DM / Bölge sekme değiştir

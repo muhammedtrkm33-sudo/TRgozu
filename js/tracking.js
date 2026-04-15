@@ -1,4 +1,4 @@
-// TR-GOZU Konum Takip Modülü
+﻿// TR-GOZU Konum Takip Modülü
 
 let trackingWatchId = null;
 let trackingTimer = null;
@@ -31,7 +31,7 @@ function startLiveTracking() {
                 });
             }
 
-            // Haritadaki markerı güncelle
+            // Haritadaki marker'ı güncelle
             updateUserMarker(latitude, longitude);
         },
         (error) => {
@@ -67,10 +67,10 @@ async function updateLocationInterval() {
 
         // Hareket kontrolü
         if (lastKnownPosition) {
-            const moved = calculateDistance(
+            const moved = typeof calculateDistance === 'function' ? calculateDistance(
                 lastKnownPosition.lat, lastKnownPosition.lng,
                 latitude, longitude
-            ) > 0.05; // 50 metre
+            ) > 0.05 : true; // 50 metre
 
             if (moved) {
                 STATE.currentLocation = { lat: latitude, lng: longitude };
@@ -91,7 +91,7 @@ async function updateLocationInterval() {
     }
 }
 
-// Kullanıcı markerını güncelle
+// Kullanıcı marker'ını güncelle
 function updateUserMarker(lat, lng) {
     if (!window.map) return;
 
@@ -131,7 +131,7 @@ function updateTrackingList() {
     const activeCitizens = citizens.filter(c => c.lat && c.lng);
 
     activeCitizens.sort((a, b) => {
-        // SOS olanları önce göster
+        // SOS olanlar önce göster
         if (a.isPanic && !b.isPanic) return -1;
         if (!a.isPanic && b.isPanic) return 1;
         if (a.isSOS && !b.isSOS) return -1;
@@ -152,9 +152,9 @@ function updateTrackingList() {
         });
 
         const statusClass = c.isPanic ? 'panic-card' : c.isSOS ? 'sos-card' : '';
-        const statusBadge = c.isPanic ? '🚨 PANİK' : c.isSOS ? '🆘 SOS' : '🟢 Aktif';
+        const statusBadge = c.isPanic ? '🚨 PANİK' : c.isSOS ? '🆘 SOS' : '✅ Aktif';
         const batteryIcon = c.battery != null ?
-            (c.battery <= 10 ? '🔴' : c.battery <= 30 ? '🟡' : '🟢') : '';
+            (c.battery <= 10 ? '🪫' : c.battery <= 30 ? '⚠️' : '🔋') : '';
 
         listDiv.innerHTML += `
             <div class="admin-card ${statusClass}" onclick="flyToLocation(${c.lat}, ${c.lng})">
@@ -163,7 +163,7 @@ function updateTrackingList() {
                         ${statusBadge} ${c.email}
                     </span>
                     <span style="font-size: 11px; color: var(--text-muted);">
-                        ${priorityScore >= 50 ? '⚠️' : ''}
+                        ${priorityScore >= 50 ? '📍' : '🚶'}
                     </span>
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">

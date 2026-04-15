@@ -1,0 +1,27 @@
+﻿{
+  "name": "TR-GÖZÜ",
+  "short_name": "TR-GÖZÜ",
+  "description": "Acil Durum Ynetim Sistemi",
+  "lang": "tr-TR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "assets/trgozu.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "assets/trgozu.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ],
+  "categories": ["utilities", "safety"],
+  "prefer_related_applications": false
+}
+

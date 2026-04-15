@@ -1,29 +1,29 @@
-// TR-GOZU AI Yönlendirme Modülü
+// TR-GOZU A Ynlendirme Modl
 
-// AI yönlendirmeyi çalıştır
-async function runAIRouting() {
-    const resultsDiv = document.getElementById('routingResults');
+// A ynlendirmeyi altr
+async function runARouting() {
+    const resultsDiv = document.getElementByd('routingResults');
     if (resultsDiv) {
-        resultsDiv.innerHTML = '<p style="font-size: 11px; color: var(--text-dim);">🔄 AI analiz yapıyor...</p>';
+        resultsDiv.innerHTML = '<p style="font-size: 11px; color: var(--text-dim);"> A analiz yapyor...</p>';
     }
 
-    showToast('AI ekip yönlendirme başlatıldı...');
+    showToast('A ekip ynlendirme balatld...');
 
     const citizens = getCitizens();
     const sosList = getSOSList();
     const volunteers = getVolunteers();
 
-    // SOS olanları öncelikli grupla
+    // SOS olanlar ncelikli grupla
     const urgentCases = citizens.filter(c =>
         c.isSOS || c.isPanic ||
         c.healthStatus === 'kritik' ||
         c.healthStatus === 'enkaz'
     );
 
-    // Bölgesel gruplama
+    // Blgesel gruplama
     const regions = groupByRegion(urgentCases);
 
-    // Yönlendirme önerileri
+    // Ynlendirme nerileri
     const routing = [];
 
     for (const region of regions) {
@@ -37,53 +37,53 @@ async function runAIRouting() {
             priority: calculateRegionPriority(region.cases)
         });
 
-        // Haritaya işaretle
+        // Haritaya iaretle
         if (window.map && region.cases.length > 0) {
             addRegionMarker(center.lat, center.lng, region.cases.length, region.priority);
         }
     }
 
-    // UI'ı güncelle
+    // U' gncelle
     if (resultsDiv) {
         resultsDiv.innerHTML = routing.map(r => `
             <div class="routing-card" style="border-left-color: ${getPriorityColor(r.priority)};">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <strong>Bölge ${r.region.name || 'Merkez'}</strong>
+                    <strong>Blge ${r.region.name || 'Merkez'}</strong>
                     <span style="background: ${getPriorityColor(r.priority)}; padding: 2px 8px; border-radius: 8px; font-size: 10px; color: white;">
                         ${r.priority.toUpperCase()}
                     </span>
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-                    📍 ${r.center.lat.toFixed(3)}, ${r.center.lng.toFixed(3)}<br>
-                    👥 ${r.cases.length} acil vaka<br>
-                    🚑 ${r.teamCount} ekip gerekli
+                     ${r.center.lat.toFixed(3)}, ${r.center.lng.toFixed(3)}<br>
+                     ${r.cases.length} acil vaka<br>
+                     ${r.teamCount} ekip gerekli
                 </div>
                 <button class="btn btn-outline btn-sm" style="margin-top: 8px; padding: 6px 10px;"
                         onclick="flyToLocation(${r.center.lat}, ${r.center.lng})">
-                    Haritada Göster
+                    Haritada Gster
                 </button>
             </div>
         `).join('');
     }
 
-    showToast(`AI analiz tamamlandı! ${routing.length} bölge tespit edildi.`);
+    showToast(`A analiz tamamland! ${routing.length} blge tespit edildi.`);
 }
 
-// Bölgeye göre grupla
+// Blgeye gre grupla
 function groupByRegion(cases) {
     const groups = {};
 
     cases.forEach(c => {
         if (!c.lat || !c.lng) return;
 
-        // Koordinatları 0.1 dereceye yuvarla (yaklaşık 11 km)
+        // Koordinatlar 0.1 dereceye yuvarla (yaklak 11 km)
         const gridLat = Math.round(c.lat * 10) / 10;
         const gridLng = Math.round(c.lng * 10) / 10;
         const key = `${gridLat},${gridLng}`;
 
         if (!groups[key]) {
             groups[key] = {
-                name: `Bölge ${Object.keys(groups).length + 1}`,
+                name: `Blge ${Object.keys(groups).length + 1}`,
                 lat: gridLat,
                 lng: gridLng,
                 cases: []
@@ -95,7 +95,7 @@ function groupByRegion(cases) {
     return Object.values(groups);
 }
 
-// Bölge merkezini hesapla
+// Blge merkezini hesapla
 function calculateRegionCenter(cases) {
     if (cases.length === 0) {
         return { lat: 0, lng: 0 };
@@ -110,7 +110,7 @@ function calculateRegionCenter(cases) {
     };
 }
 
-// Bölge önceliğini hesapla
+// Blge nceliini hesapla
 function calculateRegionPriority(cases) {
     let score = 0;
 
@@ -128,7 +128,7 @@ function calculateRegionPriority(cases) {
     return 'low';
 }
 
-// Öncelik rengini al
+// ncelik rengini al
 function getPriorityColor(priority) {
     const colors = {
         critical: 'var(--primary)',
@@ -139,7 +139,7 @@ function getPriorityColor(priority) {
     return colors[priority] || 'var(--text-muted)';
 }
 
-// Bölge markerı ekle
+// Blge marker ekle
 function addRegionMarker(lat, lng, count, priority) {
     const color = getPriorityColor(priority);
 
@@ -151,14 +151,14 @@ function addRegionMarker(lat, lng, count, priority) {
         weight: 3
     }).addTo(window.map).bindPopup(`
         <b style="color: ${color}">${count} Acil Vaka</b><br>
-        Öncelik: ${priority.toUpperCase()}
+        ncelik: ${priority.toUpperCase()}
     `);
 }
 
-// Ekip yönlendirme önerisi al
+// Ekip ynlendirme nerisi al
 function getTeamRecommendation(lat, lng) {
     const volunteers = findNearbyVolunteers(lat, lng, 10);
-    const units = []; // fetchNearbyUnits çağrısından gelecek
+    const units = []; // fetchNearbyUnits arsndan gelecek
 
     return {
         volunteers: volunteers.slice(0, 5),
@@ -166,3 +166,4 @@ function getTeamRecommendation(lat, lng) {
         safestRoute: calculateSafestRoute(lat, lng)
     };
 }
+

@@ -1,8 +1,52 @@
-// TR-GOZU Kurum ve Kuruluş Modülü (Hastane Kapasitesi + OSRM Rota)
+// TR-GOZU Kurum ve Kurulu Modl (Hastane Kapasitesi + OSRM Rota)
 
 let selectedInstitution = null;
 
-// Hastane kapasitesi simüle et (isim hash tabanlı)
+// Mock kurum detayları üret (adres, telefon, çalışma saatleri)
+function generateMockInstitutionDetails(name, type) {
+    // Hash tabanl tutarl mock veriler
+    let hash = 0;
+    const combined = name + type;
+    for (let i = 0; i < combined.length; i++) {
+        hash = ((hash << 5) - hash) + combined.charCodeAt(i);
+        hash |= 0;
+    }
+    const seed = Math.abs(hash);
+
+    // Mock adresler
+    const streets = ['Atatrk Caddesi', 'İstiklal Sokak', 'Cumhuriyet Bulvar', 'Gazi Mustafa Kemal Caddesi', 'İnn Sokak', 'Zafer Caddesi', 'Bar Bulvar', 'zgrlk Sokak'];
+    const districts = ['Merkez', 'Yeniehir', 'ankaya', 'Kadky', 'skdar', 'Beikta', 'ili', 'Bakrky', 'mraniye', 'Pendik'];
+    const cities = ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya', 'Adana', 'Konya', 'Gaziantep'];
+
+    const street = streets[seed % streets.length];
+    const district = districts[(seed >> 8) % districts.length];
+    const city = cities[(seed >> 16) % cities.length];
+    const buildingNo = 10 + (seed % 190);
+    const address = `${street} No:${buildingNo}, ${district}, ${city}`;
+
+    // Mock telefonlar
+    const areaCodes = ['216', '212', '232', '224', '242', '322', '332', '342'];
+    const areaCode = areaCodes[seed % areaCodes.length];
+    const phone1 = 1000000 + (seed % 9000000);
+    const phone2 = 1000000 + ((seed >> 8) % 9000000);
+    const phone = `(${areaCode}) ${phone1.toString().slice(0,3)}-${phone1.toString().slice(3)}`;
+
+    // Mock alma saatleri
+    const hourTypes = [
+        '24 Saat Ak',
+        '08:00-18:00',
+        '09:00-17:00',
+        '07:00-19:00',
+        '24 Saat Acil Servis',
+        '08:00-20:00',
+        '06:00-22:00'
+    ];
+    const hours = hourTypes[seed % hourTypes.length];
+
+    return { address, phone, hours };
+}
+
+// Hastane kapasitesi simle et (isim hash tabanl)
 function simulateHospitalCapacity(name) {
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -13,12 +57,12 @@ function simulateHospitalCapacity(name) {
     const totalBeds = 50 + (seed % 251);         // 50-300 yatak
     const occupancyPct = 50 + (seed % 46);        // %50-95 doluluk
     const available = Math.round(totalBeds * (1 - occupancyPct / 100));
-    const emergencyOk = (seed % 3) !== 0;         // 2/3 oranında acil kapasitesi var
+    const emergencyOk = (seed % 3) !== 0;         // 2/3 orannda acil kapasitesi var
 
     return { totalBeds, occupancyPct, available, emergencyOk };
 }
 
-// Kurumları yükle
+// Kurumlar yükle
 async function loadInstitutions() {
     if (!STATE.currentLocation) {
         showToast('Konumunuzu aktif edin!');
@@ -39,7 +83,7 @@ async function loadInstitutions() {
     if (!list) return;
 
     if (units.length === 0) {
-        list.innerHTML = '<p style="font-size: 11px; color: var(--text-dim);">Yakında kurum bulunamadı.</p>';
+        list.innerHTML = '<p style="font-size: 11px; color: var(--text-dim);">Yaknda kurum bulunamad.</p>';
         return;
     }
 
@@ -52,32 +96,32 @@ async function loadInstitutions() {
     list.innerHTML = `
         ${hospitals.length > 0 ? `
             <div style="margin-bottom: 10px;">
-                <div style="font-size: 10px; color: var(--hospital); font-weight: 600; margin-bottom: 5px;">🏥 HASTANE / SAĞLIK</div>
+                <div style="font-size: 10px; color: var(--hospital); font-weight: 600; margin-bottom: 5px;"> HASTANE / SALK</div>
                 ${hospitals.slice(0, lim).map(u => institutionCard(u)).join('')}
             </div>
         ` : ''}
         ${assembly.length > 0 ? `
             <div style="margin-bottom: 10px;">
-                <div style="font-size: 10px; color: var(--success); font-weight: 600; margin-bottom: 5px;">🏠 TOPLANMA / OKUL / MEYDAN</div>
+                <div style="font-size: 10px; color: var(--success); font-weight: 600; margin-bottom: 5px;"> TOPLANMA / OKUL / MEYDAN</div>
                 ${assembly.slice(0, lim).map(u => institutionCard(u)).join('')}
             </div>
         ` : ''}
         ${emergency.length > 0 ? `
             <div style="margin-bottom: 10px;">
-                <div style="font-size: 10px; color: var(--warning); font-weight: 600; margin-bottom: 5px;">🚨 POLİS · İTFAİYE · AMBULANS · JANDARMA</div>
+                <div style="font-size: 10px; color: var(--warning); font-weight: 600; margin-bottom: 5px;"> POLİS  İTFAİYE  AMBULANS  JANDARMA</div>
                 ${emergency.slice(0, lim).map(u => institutionCard(u)).join('')}
             </div>
         ` : ''}
         ${government.length > 0 ? `
             <div style="margin-bottom: 10px;">
-                <div style="font-size: 10px; color: var(--secondary); font-weight: 600; margin-bottom: 5px;">🏛️ KAMU (KAYMAKAMLIK / VALİLİK / KURUM)</div>
+                <div style="font-size: 10px; color: var(--secondary); font-weight: 600; margin-bottom: 5px;"> KAMU (KAYMAKAMLK / VALİLİK / KURUM)</div>
                 ${government.slice(0, lim).map(u => institutionCard(u)).join('')}
             </div>
         ` : ''}
     `;
 }
 
-// Kurum kartı HTML (hastanelere kapasite bilgisi eklendi)
+// Kurum kart HTML (hastanelere kapasite bilgisi eklendi + detayl bilgiler)
 function institutionCard(unit) {
     const distance = STATE.currentLocation
         ? calculateDistance(
@@ -87,11 +131,14 @@ function institutionCard(unit) {
         : '-';
 
     const icons = {
-        hospital: '🏥', police: '🚔', fire: '🚒',
-        ambulance: '🚑', assembly: '🏢', park: '🌳',
-        school: '🏫', square: '⛲', unknown: '📍',
-        gendarmerie: '🛡️', military: '🎖️', government: '🏛️'
+        hospital: '', police: '', fire: '',
+        ambulance: '', assembly: '', park: '',
+        school: '', square: '', unknown: '',
+        gendarmerie: '', military: '', government: ''
     };
+
+    // Mock detay bilgileri (gerçek OSM verisi yok)
+    const mockDetails = generateMockInstitutionDetails(unit.name, unit.type);
 
     let capacityHtml = '';
     if (unit.type === 'hospital') {
@@ -111,8 +158,8 @@ function institutionCard(unit) {
                 </div>
                 <div style="display:flex;justify-content:space-between;margin-top:2px;font-size:10px;color:#888">
                     <span>Toplam: ${cap.totalBeds} yatak</span>
-                    <span style="color:${cap.available > 0 ? '#2ecc71' : '#ff4757'}">Boş: ${cap.available}</span>
-                    <span>${cap.emergencyOk ? '🟢 Acil OK' : '🔴 Acil Dolu'}</span>
+                    <span style="color:${cap.available > 0 ? '#2ecc71' : '#ff4757'}">Bo: ${cap.available}</span>
+                    <span>${cap.emergencyOk ? ' Acil OK' : ' Acil Dolu'}</span>
                 </div>
             </div>
         `;
@@ -120,11 +167,20 @@ function institutionCard(unit) {
 
     return `
         <div class="institution-card" onclick="selectInstitution(${unit.lat}, ${unit.lng}, '${escapeHtml(unit.name)}', '${unit.type}')">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 1.1rem;">${icons[unit.type] || '📍'}</span>
-                <span style="font-size: 11px; color: var(--text-muted);">${distance}</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 1.2rem;">${icons[unit.type] || ''}</span>
+                <span style="font-size: 11px; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 10px;">${distance}</span>
             </div>
-            <div style="font-size: 12px; font-weight: 600; margin-top: 4px;">${escapeHtml(unit.name)}</div>
+            <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px; line-height: 1.3;">${escapeHtml(unit.name)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+                 ${escapeHtml(mockDetails.address)}
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+                 ${mockDetails.phone}
+            </div>
+            <div style="font-size: 10px; color: var(--text-dim); margin-bottom: 6px;">
+                 ${mockDetails.hours}
+            </div>
             ${capacityHtml}
         </div>
     `;
@@ -140,12 +196,12 @@ async function selectInstitution(lat, lng, name, type) {
 
     if (STATE.currentLocation && typeof drawOSRMRoute === 'function') {
         const colors = {
-            hospital: '#9b59b6', assembly: '#2ecc71', park: '#27ae60',
-            school: '#f39c12', police: '#3498db', fire: '#e67e22',
+            hospital: '#ffffff', assembly: '#2ecc71', park: '#27ae60',
+            school: '#f39c12', police: '#c20000', fire: '#e67e22',
             ambulance: '#e74c3c', square: '#1abc9c',
             gendarmerie: '#8e44ad', military: '#5d4e75', government: '#16a085'
         };
-        showToast(`${name} için rota hesaplanıyor...`);
+        showToast(`${name} iin rota hesaplanyor...`);
         await drawOSRMRoute(
             STATE.currentLocation.lat, STATE.currentLocation.lng,
             lat, lng,
@@ -156,10 +212,10 @@ async function selectInstitution(lat, lng, name, type) {
         addMarkerToMap(lat, lng, '#2ecc71', `${type.toUpperCase()}: ${name}`);
     }
 
-    showToast(`${name} seçildi — rota çizildi.`);
+    showToast(`${name} seildi  rota izildi.`);
 }
 
-// Kurum modalını aç
+// Kurum modalın aç
 function openInstitutionModal() {
     const modal = document.getElementById('institutionModal');
     if (modal) {
@@ -168,7 +224,7 @@ function openInstitutionModal() {
     }
 }
 
-// Kurum modalını kapat
+// Kurum modalın kapat
 function closeInstitutionModal() {
     const modal = document.getElementById('institutionModal');
     if (modal) modal.classList.add('hidden');
@@ -230,7 +286,7 @@ async function findNearestInstitution(type) {
     return filtered[0];
 }
 
-// Tüm kurumları haritaya ekle
+// Tüm kurumlar haritaya ekle
 async function addAllInstitutionsToMap() {
     if (!STATE.currentLocation) return;
 
@@ -246,3 +302,4 @@ async function addAllInstitutionsToMap() {
         }
     });
 }
+

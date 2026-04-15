@@ -1,4 +1,4 @@
-// TR-GOZU Harita Modülü
+// TR-GÖZÜ Harita Modülü
 
 let map;
 let userMarker;
@@ -8,7 +8,7 @@ let earthquakeCircles = [];
 let riskZones = [];
 let unitMarkers = [];
 let teamMarkers = [];
-let sosAdminMarkers = {}; // SOS markerları: key -> marker
+let sosAdminMarkers = {}; // SOS markerlar: key -> marker
 let heatmapLayer = null;
 let routeLayer = null;
 let priorityZoneLayers = [];
@@ -44,69 +44,68 @@ function bindTileError(layer) {
     });
 }
 
-// Harita başlat
+// Haritayı başlat
 function initMap() {
-    if (map) return;
-
-    map = L.map('map', {
-        zoomControl: false,
-        attributionControl: true,
-        maxZoom: 19,
-        minZoom: 2
-    }).setView([39.92, 32.85], 6);
-
-    // Koyu tema katmanı - hata yönetimi eklendi
-    darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; TR-GOZU 2026',
-        maxZoom: 19,
-        maxNativeZoom: 18,
-        errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-    }).addTo(map);
-
-    bindTileError(darkLayer);
-
-    // Uydu görüntüsü katmanı
-    satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        attribution: '&copy; Esri, Maxar, Earthstar Geographics | Uydu',
-        maxZoom: 19,
-        maxNativeZoom: 18,
-        errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-    });
-
-    bindTileError(satelliteLayer);
-
-    // OpenStreetMap — güncel vektör dünya haritası (OpenStreetMap katkıcıları)
-    osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-        maxNativeZoom: 19,
-        subdomains: 'abc',
-        errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-    });
-
-    bindTileError(osmLayer);
-
-    window.map = map;
-    firmsLayerGroup = L.layerGroup().addTo(map);
-
-    // Harita yüklenince boyutu ayarla
-    setTimeout(() => map.invalidateSize(), 300);
-
-    map.on('zoomend', function () {
-        map.invalidateSize();
-    });
-    map.on('moveend', function () {
-        map.invalidateSize();
-    });
-
-    // Harita tıklama — OpenWeather: sıcaklık, basınç, nem, yağış, AQI (tıklanan koordinat)
-    map.on('click', function(e) {
-        if (typeof showMapClickWeatherPopup === 'function') {
-            showMapClickWeatherPopup(e.latlng.lat, e.latlng.lng);
-        } else if (typeof fetchAndShowAirQuality === 'function') {
-            fetchAndShowAirQuality(e.latlng.lat, e.latlng.lng);
+    try {
+        console.log('📍 Harita başlatma isteği alındı...');
+        if (map) {
+            console.log('ℹ️ Harita zaten başlatılmış, invalidateSize yapılıyor.');
+            map.invalidateSize();
+            return;
         }
-    });
+
+        // Leaflet kontrolü
+        if (typeof L === 'undefined') {
+            console.error('❌ Leaflet kütüphanesi (L) bulunamadı! CDN yüklemesi başarısız olmuş olabilir.');
+            showToast('Harita kütüphanesi yüklenemedi, lütfen internetinizi kontrol edin.');
+            return;
+        }
+
+        const mapContainer = document.getElementById('map');
+        if (!mapContainer) {
+            console.error('❌ Harita divi (id="map") DOM\'da bulunamadı!');
+            return;
+        }
+
+        // Container boyutlarını kontrol et
+        if (mapContainer.offsetHeight === 0) {
+            console.warn('⚠️ Harita divi yüksekliği 0. Görünür olması bekleniyor...');
+        }
+
+        map = L.map('map', {
+            zoomControl: false,
+            attributionControl: true,
+            maxZoom: 19,
+            minZoom: 2,
+            tap: false // Android WebView tıklama sorunlarını önler
+        }).setView([39.92, 32.85], 6);
+
+        // Koyu tema (CartoDB) - En sağlam tile sağlayıcı
+        darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; TR-GÖZÜ',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        });
+
+        satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; Esri'
+        });
+
+        window.map = map;
+
+        // Boyutu hemen ve biraz sonra tekrar güncelle (Android WebView garantisi)
+        map.invalidateSize();
+        setTimeout(() => map.invalidateSize(), 500);
+        setTimeout(() => map.invalidateSize(), 2000);
+
+        console.log('✅ Harita başarıyla kuruldu.');
+    } catch (error) {
+        console.error('❌ initMap hatası:', error);
+    }
 }
 
 function setBaseLayerMode(mode) {
@@ -144,10 +143,10 @@ function toggleSatellite() {
 }
 
 async function loadFirmsForCurrentBounds() {
-    if (!map || !firmsLayerGroup || typeof fetchFIRMSHotspotsInBBox !== 'function') return;
+    if (!map || !firmsLayerGroup || typeof fetchFRMSHotspotsInBBox !== 'function') return;
     const b = map.getBounds();
     firmsLayerGroup.clearLayers();
-    const pts = await fetchFIRMSHotspotsInBBox(
+    const pts = await fetchFRMSHotspotsInBBox(
         b.getWest(), b.getSouth(), b.getEast(), b.getNorth()
     );
     pts.forEach(h => {
@@ -164,8 +163,8 @@ async function loadFirmsForCurrentBounds() {
             <b>Uydu sıcak nokta (VIIRS NRT)</b><br>
             NASA FIRMS uyumlu | FRP: ${(h.frp || 0).toFixed(2)} MW<br>
             Parlaklık: ${(h.brightness || 0).toFixed(1)} K<br>
-            Güven: ${h.confidence || '-'} · ${h.daynight}<br>
-            <small>Endüstriyel ısı / orman yangını olasılığı — yer doğrulaması gerekir</small>
+            Güven: ${h.confidence || '-'} ${h.daynight}<br>
+            <small>Endüstriyel ısı / orman yangını olasılığı - yer doğrulaması gerekir</small>
         `);
         circle.addTo(firmsLayerGroup);
     });
@@ -184,7 +183,7 @@ function toggleFirmsHotspots() {
             firmsMoveEndHandler = () => { if (refreshFirmsDebounced) refreshFirmsDebounced(); };
             map.on('moveend', firmsMoveEndHandler);
         }
-        showToast('NASA VIIRS sıcak noktaları yüklendi (harita alanına göre güncellenir).');
+        showToast('NASA VIIRS sıcak noktalar yüklendi (harita alanına göre güncellenir).');
     } else {
         if (firmsLayerGroup) firmsLayerGroup.clearLayers();
         if (firmsMoveEndHandler) {
@@ -210,7 +209,7 @@ function createSOSIcon(isPanic = false) {
             box-shadow: 0 0 25px rgba(255,71,87,0.7);
             animation: ${isPanic ? 'sosPanic 0.5s infinite' : 'sosPulse 2s infinite'};
             border: 2px solid rgba(255,255,255,0.5);
-        ">🆘 ${label}</div>`,
+        "> ${label}</div>`,
         iconSize: [80, 30],
         iconAnchor: [40, 15]
     });
@@ -248,7 +247,7 @@ function getMarkerColorByActivity(lastActiveIso) {
 
 // Takım ikonu oluştur
 function createTeamIcon(type) {
-    const icons = { afad: '🏢', umke: '🏥', police: '🚔', fire: '🚒', volunteer: '❤️' };
+    const icons = { afad: '', umke: '', police: '', fire: '', volunteer: '' };
     return L.divIcon({
         className: 'team-marker',
         html: `<div style="
@@ -263,18 +262,18 @@ function createTeamIcon(type) {
             font-size: 18px;
             border: 2px solid white;
             box-shadow: 0 0 15px rgba(46,204,113,0.5);
-        ">${icons[type] || '📍'}</div>`,
+        ">${icons[type] || ''}</div>`,
         iconSize: [36, 36],
         iconAnchor: [18, 18]
     });
 }
 
-// 4km Termal Daire Çiz (sıcaklık + nem + hissedilen sıcaklık)
+// 5km Termal Daire çiz (sıcaklık + nem + hissedilen sıcaklık)
 function drawThermalZone(lat, lng, temp, humidity) {
     if (thermalZone) { map.removeLayer(thermalZone); thermalZone = null; }
     if (thermalLabelMarker) { map.removeLayer(thermalLabelMarker); thermalLabelMarker = null; }
 
-    const heatIdx = typeof calculateHeatIndex === 'function'
+    const heatIndex = typeof calculateHeatIndex === 'function'
         ? calculateHeatIndex(temp, humidity)
         : temp;
 
@@ -286,7 +285,7 @@ function drawThermalZone(lat, lng, temp, humidity) {
     else if (temp < 35) zoneColor = '#ffa502';
     else zoneColor = '#ff4757';
 
-    // 5 km yarıçap — konumunuza göre sıcaklık / hissedilen sıcaklık özeti
+    // 5 km yarıçap konumunuza göre sıcaklık / hissedilen sıcaklık özeti
     thermalZone = L.circle([lat, lng], {
         radius: 5000,
         color: zoneColor,
@@ -298,8 +297,8 @@ function drawThermalZone(lat, lng, temp, humidity) {
 
     thermalZone.bindPopup(`
         <b>5 km Sıcaklık Özeti</b><br>
-        Sıcaklık: <b>${temp}°C</b><br>
-        Hissedilen: <b style="color:${zoneColor}">${heatIdx}°C</b><br>
+        Sıcaklık: <b>${temp}C</b><br>
+        Hissedilen: <b style="color:${zoneColor}">${heatIndex}C</b><br>
         Nem: ${humidity != null ? humidity + '%' : '-'}<br>
         <small style="color:#aaa">OpenWeatherMap verisi</small>
     `);
@@ -309,7 +308,7 @@ function drawThermalZone(lat, lng, temp, humidity) {
         icon: L.divIcon({
             className: 'thermal-label-icon',
             html: `<div class="thermal-badge" style="border-color:${zoneColor}">
-                     🌡️ ${temp}°C &nbsp;|&nbsp; His: ${heatIdx}°C
+                      ${temp}C &nbsp;|&nbsp; His: ${heatIndex}C
                    </div>`,
             iconSize: [210, 32],
             iconAnchor: [105, -8]
@@ -353,10 +352,10 @@ function addMarkerToMap(lat, lng, color, title) {
     return marker;
 }
 
-// Birim markerı ekle
+// Birim marker ekle
 function addUnitMarker(unit) {
     const colors = {
-        hospital: '#9b59b6', police: '#3498db', fire: '#e67e22',
+        hospital: '#ffffff', police: '#c20000', fire: '#e67e22',
         ambulance: '#e74c3c', assembly: '#2ecc71', park: '#27ae60',
         school: '#f39c12', square: '#1abc9c',
         gendarmerie: '#8e44ad', military: '#5d4e75', government: '#16a085'
@@ -366,7 +365,7 @@ function addUnitMarker(unit) {
         icon: createNormalIcon(colors[unit.type] || '#00d2ff')
     }).addTo(map);
 
-    const dist = STATE.currentLocation
+    const dist = (STATE.currentLocation && typeof calculateDistance === 'function')
         ? calculateDistance(STATE.currentLocation.lat, STATE.currentLocation.lng, unit.lat, unit.lng).toFixed(1) + ' km'
         : '-';
 
@@ -374,7 +373,7 @@ function addUnitMarker(unit) {
     unitMarkers.push(marker);
 }
 
-// Deprem markerı ekle (Kandilli / USGS verisi)
+// Deprem marker ekle (Kandilli / USGS verisi)
 function addEarthquakeMarker(earthquake) {
     const mag = earthquake.magnitude || 0;
     const circle = L.circle([earthquake.lat, earthquake.lng], {
@@ -426,14 +425,14 @@ async function drawOSRMRoute(startLat, startLng, endLat, endLng, color, destinat
         L.marker(route.coordinates[midIdx], {
             icon: L.divIcon({
                 className: 'route-info-icon',
-                html: `<div class="route-info-badge">${route.distanceKm} km · yaklaşık ${route.durationMin} dk</div>`,
+                html: `<div class="route-info-badge">${route.distanceKm} km | yaklaşık ${route.durationMin} dk</div>`,
                 iconSize: [130, 24],
                 iconAnchor: [65, 12]
             }),
             interactive: false
         }).addTo(routeGroup);
     } else {
-        // OSRM başarısız — düz çizgi fallback
+        // OSRM başarısız - düz çizgi fallback
         L.polyline([[startLat, startLng], [endLat, endLng]], {
             color,
             weight: 4,
@@ -522,7 +521,7 @@ async function drawMultipleOSRMRoutes(entries, startLat, startLng) {
             L.marker(route.coordinates[midIdx], {
                 icon: L.divIcon({
                     className: 'route-info-icon',
-                    html: `<div class="route-info-badge">${route.distanceKm} km · yaklaşık ${route.durationMin} dk</div>`,
+                    html: `<div class="route-info-badge">${route.distanceKm} km | yaklaşık ${route.durationMin} dk</div>`,
                     iconSize: [168, 24],
                     iconAnchor: [84, 12]
                 }),
@@ -614,7 +613,7 @@ function updatePriorityZones() {
     priorityZoneLayers.forEach(l => map.removeLayer(l));
     priorityZoneLayers = [];
 
-    const sosList = getSOSList();
+    const sosList = typeof getSOSList === 'function' ? getSOSList() : [];
     const gridSize = 0.08;
     const densityMap = {};
 
@@ -682,8 +681,8 @@ function requestLocation() {
             const locBtn = document.getElementById('locBtn');
             if (locBtn) locBtn.style.display = 'none';
 
-            const email = getCurrentUserEmail();
-            if (email) {
+            const email = typeof getCurrentUserEmail === 'function' ? getCurrentUserEmail() : null;
+            if (email && typeof updateCitizen === 'function') {
                 updateCitizen(email, {
                     lat: latitude,
                     lng: longitude,
@@ -753,8 +752,8 @@ function loadCitizensOnMap() {
         }
     });
 
-    const citizens = getCitizens();
-    const sosList = getSOSList();
+    const citizens = typeof getCitizens === 'function' ? getCitizens() : [];
+    const sosList = typeof getSOSList === 'function' ? getSOSList() : [];
 
     const listDiv = document.getElementById('citizenTrackList');
     const sosListDiv = document.getElementById('sosSignalList');
@@ -764,7 +763,6 @@ function loadCitizensOnMap() {
     const sosUnverifiedDiv = document.getElementById('sosUnverifiedList');
     if (sosUnverifiedDiv) sosUnverifiedDiv.innerHTML = '';
 
-    const sosForwarded = sosList.filter(s => !s.resolved && s.forwardToAuthority !== false);
     const sosAllActive = sosList.filter(s => !s.resolved);
     const sosEmails = new Set(sosAllActive.map(s => s.user).filter(Boolean));
 
@@ -790,8 +788,8 @@ function loadCitizensOnMap() {
             Durum: ${isSOS ? (isPanic ? '<span style="color:#ff4757">PANİK</span>' : '<span style="color:#ff4757">SOS</span>') : 'Normal'}<br>
             Sağlık: ${healthBadge} ${c.healthStatus ? CONFIG.HEALTH_STATUS[c.healthStatus]?.label || '-' : '-'}<br>
             Batarya: ${battStr}<br>
-            Son aktif: ${timeSince(c.lastActive)}<br>
-            Son hareket: ${timeSince(c.lastMoveAt)}
+            Son görülme: ${typeof timeSince === 'function' ? timeSince(c.lastActive) : c.lastActive}<br>
+            Son hareket: ${typeof timeSince === 'function' ? timeSince(c.lastMoveAt) : c.lastMoveAt}
         `);
 
         if (c.healthStatus === 'kritik' || c.healthStatus === 'enkaz') {
@@ -814,7 +812,7 @@ function loadCitizensOnMap() {
                 : '<span class="text-success">Aktif</span>';
 
             const battIcon = c.battery != null
-                ? (c.battery <= 10 ? '🔴' : c.battery <= 30 ? '🟡' : '🟢') : '';
+                ? (c.battery <= 10 ? '🪫' : c.battery <= 30 ? '⚠️' : '🔋') : '';
 
             const minsMove = c.lastMoveAt
                 ? Math.round((Date.now() - new Date(c.lastMoveAt)) / 60000)
@@ -828,7 +826,7 @@ function loadCitizensOnMap() {
                         ${statusBadge}
                     </div>
                     <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-                        Son görülme: ${timeSince(c.lastActive)}
+                        Son görülme: ${typeof timeSince === 'function' ? timeSince(c.lastActive) : c.lastActive}
                         ${minsMove !== null ? ` | Hareket: ${minsMove} dk önce` : ''}
                         ${battIcon} ${c.battery != null ? '%' + c.battery : ''} ${healthBadge}
                     </div>
@@ -837,7 +835,7 @@ function loadCitizensOnMap() {
         }
     });
 
-    // SOS listesi ve harita markerları
+    // SOS listesi ve harita markerlar
     sosList.slice().reverse().forEach(s => {
         if (s.resolved || !s.lat || !s.lng) return;
 
@@ -854,7 +852,7 @@ function loadCitizensOnMap() {
                         <span class="text-warning" style="font-size:10px;">eşleşme yok</span>
                     </div>
                     <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
-                        ${formatTime(s.time)} | ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}<br>
+                        ${typeof formatTime === 'function' ? formatTime(s.time) : s.time} | ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}<br>
                         <span style="opacity:0.9">${kd}</span>
                     </div>
                 </div>`;
@@ -866,12 +864,12 @@ function loadCitizensOnMap() {
         const m = L.marker([s.lat, s.lng], { icon: createSOSIcon(s.isPanic) }).addTo(map);
         const kNote =
             s.forwardToAuthority === false
-                ? '<br><small style="color:#f59e0b">Kandilli eşleşmesi yok — yine de konum görünür</small>'
+                ? '<br><small style="color:#f59e0b">Kandilli eşleşmesi yok - yine de konum görünür</small>'
                 : '';
         m.bindPopup(`
             <b style="color:#ff4757">${s.isPanic ? 'PANİK' : 'SOS'}</b><br>
             ${s.user}<br>
-            ${formatTime(s.time)}${kNote}
+            ${typeof formatTime === 'function' ? formatTime(s.time) : s.time}${kNote}
         `);
         sosAdminMarkers[key] = m;
 
@@ -884,7 +882,7 @@ function loadCitizensOnMap() {
                         ${s.isPanic ? '<span class="text-danger" style="font-weight:bold">PANİK</span>' : ''}
                     </div>
                     <div style="font-size:11px;color:var(--text-muted);">
-                        ${formatTime(s.time)} | ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}
+                        ${typeof formatTime === 'function' ? formatTime(s.time) : s.time} | ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}
                     </div>
                 </div>
             `;
@@ -898,7 +896,7 @@ function flyToLocation(lat, lng, zoom) {
     if (map) map.flyTo([lat, lng], zoom, { duration: 1 });
 }
 
-// Yardım ekibi markerı ekle
+// Yardım ekibi marker ekle
 function addTeamMarker(lat, lng, type, name) {
     const marker = L.marker([lat, lng], { icon: createTeamIcon(type) }).addTo(map);
     marker.bindPopup(`<b>${name || type.toUpperCase()}</b><br>Ekip Konumu`);
@@ -967,7 +965,7 @@ async function drawRouteToNearestSafe(kind) {
     showToast('Rota çizildi (OpenStreetMap yolları, OSRM).');
 }
 
-// Google Haritalar yönlendirme (API anahtarı gerekmez; harici uygulama/tarayıcı)
+// Google Haritalar yönlendirme (API anahtar gerekmez; harici uygulama/tarayıcı)
 function openGoogleMapsDirectionsToNearest(kind) {
     if (!STATE.currentLocation) {
         showToast('Önce konumunuzu açın.');
@@ -990,5 +988,6 @@ function invalidateMapSize() {
     if (map) setTimeout(() => map.invalidateSize(), 100);
 }
 
-window.addEventListener('resize', debounce(invalidateMapSize, 250));
+const debounceMapResize = typeof debounce === 'function' ? debounce(invalidateMapSize, 250) : invalidateMapSize;
+window.addEventListener('resize', debounceMapResize);
 window.addEventListener('orientationchange', () => setTimeout(invalidateMapSize, 300));

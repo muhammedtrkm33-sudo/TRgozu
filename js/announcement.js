@@ -1,23 +1,31 @@
-// TR-GOZU Acil Duyuru Modülü
+﻿// TR-GOZU Acil Duyuru Modülü
 
 // Duyuru modalını aç
 function openAnnouncementModal() {
-    document.getElementById('announcementModal').classList.remove('hidden');
+    const modal = document.getElementById('announcementModal');
+    if (modal) modal.classList.remove('hidden');
 }
 
 // Duyuru modalını kapat
 function closeAnnouncementModal() {
-    document.getElementById('announcementModal').classList.add('hidden');
-    document.getElementById('announcementTitle').value = '';
-    document.getElementById('announcementContent').value = '';
-    document.getElementById('announcementPriority').value = 'medium';
+    const modal = document.getElementById('announcementModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        const titleInput = document.getElementById('announcementTitle');
+        const contentInput = document.getElementById('announcementContent');
+        const priorityInput = document.getElementById('announcementPriority');
+
+        if (titleInput) titleInput.value = '';
+        if (contentInput) contentInput.value = '';
+        if (priorityInput) priorityInput.value = 'medium';
+    }
 }
 
 // Duyuru yayınla
 function submitAnnouncement() {
-    const title = document.getElementById('announcementTitle').value.trim();
-    const content = document.getElementById('announcementContent').value.trim();
-    const priority = document.getElementById('announcementPriority').value;
+    const title = document.getElementById('announcementTitle')?.value.trim();
+    const content = document.getElementById('announcementContent')?.value.trim();
+    const priority = document.getElementById('announcementPriority')?.value || 'medium';
 
     if (!title || !content) {
         showToast('Başlık ve içerik gerekli!');
@@ -59,47 +67,71 @@ function submitAnnouncement() {
 
 // Duyuru ticker (kaydıran şerit) başlat
 function initAnnouncementTicker() {
-    let tickerDiv = document.getElementById('announcementTicker');
-    if (!tickerDiv) {
-        tickerDiv = document.createElement('div');
-        tickerDiv.id = 'announcementTicker';
-        tickerDiv.className = 'ticker-wrap hidden';
-        tickerDiv.innerHTML = '<div class="ticker-content" id="tickerContent"></div>';
-        const header = document.querySelector('header') || document.body.firstChild;
-        if (header && header.parentNode) {
-            header.parentNode.insertBefore(tickerDiv, header.nextSibling);
-        } else {
-            document.body.prepend(tickerDiv);
+    try {
+        let tickerDiv = document.getElementById('announcementTicker');
+        if (!tickerDiv) {
+            tickerDiv = document.createElement('div');
+            tickerDiv.id = 'announcementTicker';
+            tickerDiv.className = 'ticker-wrap hidden';
+            tickerDiv.innerHTML = '<div class="ticker-content" id="tickerContent"></div>';
+            const header = document.querySelector('header');
+            if (header && header.parentNode) {
+                header.parentNode.insertBefore(tickerDiv, header.nextSibling);
+            } else {
+                const firstChild = document.body.firstChild;
+                if (firstChild) {
+                    document.body.insertBefore(tickerDiv, firstChild);
+                } else {
+                    document.body.appendChild(tickerDiv);
+                }
+            }
         }
-    }
 
-    const announcements = getAnnouncements();
-    updateAnnouncementTicker(announcements);
+        const announcements = getAnnouncements();
+        if (announcements && typeof announcements.filter === 'function') {
+            updateAnnouncementTicker(announcements);
+        }
+        
+        console.log('Duyuru ticker başarılı');
+    } catch (error) {
+        console.error('initAnnouncementTicker hatası:', error.message, error);
+    }
 }
 
 // Ticker içeriğini güncelle
 function updateAnnouncementTicker(announcements) {
-    const tickerDiv = document.getElementById('announcementTicker');
-    const tickerContent = document.getElementById('tickerContent');
-    if (!tickerDiv || !tickerContent) return;
+    try {
+        if (!announcements || !Array.isArray(announcements)) {
+            console.warn('updateAnnouncementTicker: announcements dizi değil veya null');
+            return;
+        }
 
-    const criticalAndHigh = announcements.filter(a =>
-        a.priority === 'critical' || a.priority === 'high'
-    );
+        const tickerDiv = document.getElementById('announcementTicker');
+        const tickerContent = document.getElementById('tickerContent');
+        if (!tickerDiv || !tickerContent) return;
 
-    if (criticalAndHigh.length === 0) {
-        tickerDiv.classList.add('hidden');
-        return;
+        const criticalAndHigh = announcements.filter(a =>
+            a && (a.priority === 'critical' || a.priority === 'high')
+        );
+
+        if (criticalAndHigh.length === 0) {
+            tickerDiv.classList.add('hidden');
+            return;
+        }
+
+        tickerDiv.classList.remove('hidden');
+
+        const texts = criticalAndHigh.map(a => {
+            const icon = (a.priority === 'critical') ? '🚨' : '⚠️';
+            const title = (a.title || 'Duyuru');
+            const content = (a.content || '');
+            return `${icon} ${title}: ${content}`;
+        }).join('      ');
+
+        tickerContent.textContent = texts;
+    } catch (error) {
+        console.error('updateAnnouncementTicker hatası:', error.message);
     }
-
-    tickerDiv.classList.remove('hidden');
-
-    const texts = criticalAndHigh.map(a => {
-        const icon = a.priority === 'critical' ? '🔴' : '🟠';
-        return `${icon} ${a.title}: ${a.content}`;
-    }).join('   •••   ');
-
-    tickerContent.textContent = texts;
 }
 
 // Vatandaş için duyuruları yükle (salt okunur)
@@ -155,7 +187,7 @@ function loadAnnouncements() {
                 ${escapeHtml(a.content)}
             </div>
             <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;">
-                ${timeSince(a.createdAt)} • ${a.createdBy?.split('@')[0] || 'Yetkili'}
+                ${timeSince(a.createdAt)}  ${a.createdBy?.split('@')[0] || 'Yetkili'}
             </div>
         </div>
     `).join('');
@@ -164,12 +196,12 @@ function loadAnnouncements() {
 // Öncelik ikonu
 function getPriorityIcon(priority) {
     const icons = {
-        critical: '🔴',
-        high: '🟠',
-        medium: '🔵',
-        low: '⚪'
+        critical: '🚨',
+        high: '⚠️',
+        medium: '📢',
+        low: 'ℹ️'
     };
-    return icons[priority] || '⚪';
+    return icons[priority] || '📢';
 }
 
 // Duyuruyu görüntüle
@@ -186,8 +218,8 @@ function viewAnnouncement(id) {
 
     // Duyuru detayını göster
     alert(`
-        📢 ${announcement.title}
-        ───────────────────────
+         ${announcement.title}
+        
         ${announcement.content}
 
         Öncelik: ${getPriorityIcon(announcement.priority)} ${announcement.priority?.toUpperCase() || 'NORMAL'}
@@ -203,7 +235,7 @@ function showCriticalAnnouncements() {
     );
 
     critical.forEach(a => {
-        showToast(`⚠️ ${a.title}`, 5000);
+        showToast(`📢 ${a.title}`, 5000);
     });
 }
 

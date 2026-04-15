@@ -1,9 +1,9 @@
-// TR-GOZU Topluluk Doğrulama Modülü
+﻿// TR-GÖZÜ Topluluk Doğrulama Modülü
 
 // Sahte ihbar engelleme sistemi
 let pendingVerification = null;
 
-// Afet bildirimi doğrula
+// Afet bildirimini doğrula
 function submitDisasterVerification(disasterType, location, description) {
     const verification = {
         id: generateId(),
@@ -13,7 +13,7 @@ function submitDisasterVerification(disasterType, location, description) {
         reporter: getCurrentUserEmail(),
         reports: [{
             user: getCurrentUserEmail(),
-            vote: null, // true, false, or null
+            vote: null,
             time: new Date().toISOString()
         }],
         status: 'pending',
@@ -22,24 +22,22 @@ function submitDisasterVerification(disasterType, location, description) {
         createdAt: new Date().toISOString()
     };
 
-    // Doğrulamaları kaydet
     const verifications = getVerifications();
     verifications.push(verification);
     saveToStorage('disasterVerifications', verifications);
 
     showToast('Bildiriminiz kaydedildi. Diğer kullanıcılar doğrulayacak.');
 
-    // Bildirimi işaretle (2+ aynı bildirim = otomatik doğrulama)
+    // Bildirimi işaretle (Threshold kontrolü)
     checkVerificationThreshold(disasterType, location);
 
     return verification;
 }
 
-// Doğrulama eşiği kontrol et
+// Doğrulama eşiği kontrolü
 function checkVerificationThreshold(disasterType, location) {
     const verifications = getVerifications();
 
-    // Aynı tür ve yakın konumdaki bildirimleri say
     const similar = verifications.filter(v => {
         if (v.debunked || v.confirmed) return false;
         if (v.disasterType !== disasterType) return false;
@@ -53,19 +51,18 @@ function checkVerificationThreshold(disasterType, location) {
     });
 
     if (similar.length >= CONFIG.VERIFICATION_THRESHOLD) {
-        // Otomatik olarak doğrulandı olarak işaretle
         similar.forEach(v => {
             v.confirmed = true;
+            v.status = 'confirmed';
             v.confirmedAt = new Date().toISOString();
         });
         saveToStorage('disasterVerifications', verifications);
 
-        showToast(`⚠️ ${similar.length} benzer bildirim! Afet otomatik olarak doğrulandı.`);
+        showToast(`✅ ${similar.length} benzer bildirim! Afet otomatik olarak doğrulandı.`);
         playSound('alert');
 
-        // Bildirim gönder
         sendNotification(
-            '🔴 Afet Doğrulandı',
+            '🚨 Afet Doğrulandı',
             `${disasterType} bildirimi ${similar.length} kişi tarafından doğrulandı!`,
             { requireInteraction: true }
         );
@@ -80,9 +77,8 @@ function voteVerification(verificationId, isTrue) {
     if (!verification) return;
 
     const email = getCurrentUserEmail();
-
-    // Kullanıcının daha önce oy verip vermediğini kontrol et
     const existingVote = verification.reports.find(r => r.user === email);
+
     if (existingVote) {
         existingVote.vote = isTrue;
         existingVote.time = new Date().toISOString();
@@ -94,12 +90,9 @@ function voteVerification(verificationId, isTrue) {
         });
     }
 
-    // Oy sayılarını hesapla
     const trueVotes = verification.reports.filter(r => r.vote === true).length;
     const falseVotes = verification.reports.filter(r => r.vote === false).length;
-    const totalVotes = verification.reports.length;
 
-    // Karar ver
     if (trueVotes >= 3 && trueVotes > falseVotes * 2) {
         verification.confirmed = true;
         verification.status = 'confirmed';
@@ -110,32 +103,26 @@ function voteVerification(verificationId, isTrue) {
 
     saveToStorage('disasterVerifications', verifications);
 
-    // Bildirim göster
     if (verification.confirmed) {
         showToast('✅ Bildirim DOĞRULANDI!');
     } else if (verification.debunked) {
-        showToast('❌ Bildirim ÇÜRÜTÜLDÜ!');
+        showToast('❌ Bildirim REDDEDİLDİ!');
     } else {
-        showToast('Oy verildi!');
+        showToast('Oyunuz kaydedildi.');
     }
 
-    // UI'ı güncelle
     loadVerifications();
 }
 
-// Doğrulamaları al
 function getVerifications() {
     return getFromStorage('disasterVerifications', []);
 }
 
-// Doğrulamaları yükle
 function loadVerifications() {
     const list = document.getElementById('verificationList');
     if (!list) return;
 
     const verifications = getVerifications();
-
-    // Aktif (henüz karara varılmamış) doğrulamaları göster
     const active = verifications.filter(v => !v.confirmed && !v.debunked);
 
     if (active.length === 0) {
@@ -146,27 +133,27 @@ function loadVerifications() {
     list.innerHTML = active.slice(0, 5).map(v => {
         const trueVotes = v.reports.filter(r => r.vote === true).length;
         const falseVotes = v.reports.filter(r => r.vote === false).length;
+        const typeInfo = CONFIG.DISASTER_TYPES?.find(d => d.id === v.disasterType) || { icon: '⚠️', label: v.disasterType };
 
         return `
             <div class="verification-card">
                 <div style="font-weight: 600;">
-                    ${CONFIG.DISASTER_TYPES.find(d => d.id === v.disasterType)?.icon || '⚠️'}
-                    ${CONFIG.DISASTER_TYPES.find(d => d.id === v.disasterType)?.label || v.disasterType}
+                    ${typeInfo.icon} ${typeInfo.label}
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
                     ${v.description ? escapeHtml(v.description).substring(0, 50) + '...' : 'Açıklama yok'}
                 </div>
                 <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;">
-                    ${trueVotes} doğru • ${falseVotes} yanlış • ${v.reports.length} oy
+                    👍 ${trueVotes} doğru | 👎 ${falseVotes} yanlış | 👥 ${v.reports.length} oy
                 </div>
                 <div style="display: flex; gap: 5px; margin-top: 8px;">
                     <button class="btn btn-success btn-sm" style="flex: 1; padding: 5px; font-size: 11px;"
                             onclick="voteVerification('${v.id}', true)">
-                        ✅ Doğru
+                         DOĞRU
                     </button>
                     <button class="btn btn-danger btn-sm" style="flex: 1; padding: 5px; font-size: 11px;"
                             onclick="voteVerification('${v.id}', false)">
-                        ❌ Yanlış
+                         YANLIŞ
                     </button>
                 </div>
             </div>
@@ -174,7 +161,6 @@ function loadVerifications() {
     }).join('');
 }
 
-// Doğrulama modalını aç
 function openVerificationModal(verificationId) {
     pendingVerification = verificationId;
     const verifications = getVerifications();
@@ -201,13 +187,11 @@ function openVerificationModal(verificationId) {
     document.getElementById('verificationModal').classList.remove('hidden');
 }
 
-// Doğrulama modalını kapat
 function closeVerificationModal() {
     document.getElementById('verificationModal').classList.add('hidden');
     pendingVerification = null;
 }
 
-// Raporu doğrula
 function verifyReport(isTrue) {
     if (pendingVerification) {
         voteVerification(pendingVerification, isTrue);
@@ -215,7 +199,6 @@ function verifyReport(isTrue) {
     closeVerificationModal();
 }
 
-// Bildirim oluştur (yetkili için)
 function createReport(disasterType, lat, lng, description) {
     const report = {
         id: generateId(),
