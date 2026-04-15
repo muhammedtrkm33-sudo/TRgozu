@@ -19,7 +19,8 @@
     "localtunnel": "^2.0.2",
     "nodemailer": "^6.10.1",
     "helmet": "^7.0.0",
-    "express-rate-limit": "^6.7.0"
+    "express-rate-limit": "^6.7.0",
+    "bcrypt": "^5.1.0"
 
   }
 }
