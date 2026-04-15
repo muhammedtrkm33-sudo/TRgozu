@@ -18,6 +18,8 @@
     "express": "^5.2.1",
     "localtunnel": "^2.0.2",
     "nodemailer": "^6.10.1",
-    "helmet": "^7.0.0"
+    "helmet": "^7.0.0",
+    "express-rate-limit": "^6.7.0"
+
   }
 }
