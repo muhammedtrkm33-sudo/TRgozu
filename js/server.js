@@ -169,18 +169,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor.`);
 
-    // Aynı Wi-Fi zorunluluğunu kaldırmak için Localtunnel başlat
-    try {
-        const localtunnel = require('localtunnel');
-        const tunnel = await localtunnel({ port: PORT, subdomain: 'trgozu-test' });
-        console.log('🚀 DIŞ DÜNYAYA AÇILDIK!');
-        console.log('🔗 Kamu URL:', tunnel.url);
-        console.log('⚠️  Bu URL\'yi auth.js içindeki AUTH_API_BASE kısmına yazmalısın.');
-
-        tunnel.on('close', () => {
-            console.log('Tunnel kapandı.');
-        });
-    } catch (err) {
-        console.log('Localtunnel başlatılamadı (İnternet veya paket eksik olabilir):', err.message);
-    }
 });
