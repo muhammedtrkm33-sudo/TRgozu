@@ -6,7 +6,15 @@ const nodemailer = require('nodemailer');
 require('dotenv').config(); // Mevcut dizindeki .env'yi oku
 
 const app = express();
+const path = require('path');
 
+// Sunucuya index.html ve diğer dosyaların bir üst klasörde olduğunu söyle
+app.use(express.static(path.join(__dirname, '../')));
+
+// Siteye girildiğinde direkt ana sayfayı aç
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../index.html'));
+});
 // Render ve Android WebView için en geniş CORS izinleri
 app.use(cors({
     origin: '*',
