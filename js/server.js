@@ -167,14 +167,19 @@ app.post('/api/messages', (req, res) => {
     writeJSON(MESSAGES_FILE, msgs);
     res.json({ success: true });
 });
+// 1. Port Ayarı (Render için dinamik, yoksa 3000)
+const PORT = process.env.PORT || 10000;
 
-app.get('/api/messages/:userId', (req, res) => {
-    const userId = decodeURIComponent(req.params.userId);
-    res.json(readJSON(MESSAGES_FILE).filter(m => m.from === userId || m.to === userId));
+// 2. Sunucuyu Başlat
+app.listen(PORT, () => {
+    console.log(`Sunucu ${PORT} portunda başarıyla çalışıyor.`);
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, async () => {
-    console.log(`Sunucu ${PORT} portunda çalışıyor.`);
+// 3. Statik Dosyalar ve Ana Sayfa Yönlendirmesi
+// (server.js 'js' klasöründe olduğu için bir üst klasöre '../' ile bakıyoruz)
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../')));
 
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../index.html'));
 });
