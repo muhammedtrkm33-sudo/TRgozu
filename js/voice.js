@@ -1,4 +1,4 @@
-﻿// TR-GOZU Sesli Uyarı Modülü
+// TR-GOZU Sesli Uyarı Modülü
 
 let voiceAlertOpen = false;
 let alertAudio = null;
@@ -77,7 +77,7 @@ function playAlertSound() {
         oscillator1.start();
         oscillator2.start();
 
-        showToast('🚨 Acil uyarı sesi alınıyor...');
+        showToast('🔊 Acil uyarı sesi çalınıyor...');
 
         // Titreşim (mobil cihazlarda)
         if ('vibrate' in navigator) {
@@ -86,7 +86,7 @@ function playAlertSound() {
 
     } catch (error) {
         console.error('Ses çalma hatası:', error);
-        showToast('Ses alınamadı!');
+        showToast('Ses çalınamadı!');
     }
 }
 
@@ -97,6 +97,7 @@ function checkAutoAlert() {
     if (!autoAlertCheck || !autoAlertCheck.checked) return;
 
     const citizens = getCitizens();
+    const sosList = getSOSList();
 
     // Kritik vaka var mı kontrol et
     const criticalCount = citizens.filter(c =>

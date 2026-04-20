@@ -1,16 +1,16 @@
-// TR-GÖZÜ API Modülü
+// TR-GOZU API Modülü
 
 // Haritada tıklanan nokta: OpenWeather Current Weather + Air Pollution (güncel, tek sağlayıcı)
 async function showMapClickWeatherPopup(lat, lng) {
-    if (!window.map || !window.L) return;
+    if (!window.map) return;
 
-    const popup = window.L.popup({ maxWidth: 300, className: 'map-weather-popup' })
+    const popup = L.popup({ maxWidth: 300, className: 'map-weather-popup' })
         .setLatLng([lat, lng])
-        .setContent('<div style="font-size:12px;color:#94a3b8;padding:4px 0">Yükleniyor<br><small>OpenWeather API</small></div>')
+        .setContent('<div style="font-size:12px;color:#94a3b8;padding:4px 0">Yükleniyor…<br><small>OpenWeather API</small></div>')
         .openOn(window.map);
 
     const weatherP = fetchWeatherData(lat, lng);
-    const airP = fetchWithRetry(
+    const airP = fetch(
         `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lng}&appid=${CONFIG.WEATHER_API_KEY}`
     )
         .then(r => (r.ok ? r.json() : null))
@@ -24,7 +24,7 @@ async function showMapClickWeatherPopup(lat, lng) {
     }
 
     const temp = Math.round(w.main.temp);
-    const heatIndex = typeof calculateHeatIndex === 'function'
+    const heatIdx = typeof calculateHeatIndex === 'function'
         ? calculateHeatIndex(temp, w.main.humidity)
         : temp;
     const desc = (w.weather && w.weather[0] && w.weather[0].description) || '';
@@ -42,46 +42,44 @@ async function showMapClickWeatherPopup(lat, lng) {
     let aqiRow = '';
     if (airJson && airJson.list && airJson.list[0]) {
         const aqi = airJson.list[0].main.aqi;
-        const labels = ['Çok İyi', 'İyi', 'Orta', 'Kötü', 'Çok Kötü'];
+        const labels = ['Çok iyi', 'İyi', 'Orta', 'Kötü', 'Çok kötü'];
         const colors = ['#2ecc71', '#a3cb38', '#f1c40f', '#e67e22', '#e74c3c'];
         const idx = Math.min(Math.max(aqi - 1, 0), 4);
         const label = labels[idx];
         const col = colors[idx];
-        aqiRow = `<tr><td style="color:#94a3b8;padding:2px 0">Hava Kirliliği</td><td><b style="color:${col}">AQI ${aqi}</b> ${label}</td></tr>`;
-        if (typeof updateAQBar === 'function') {
-            updateAQBar(aqi, { label, color: col, emoji: '' });
+        aqiRow = `<tr><td style="color:#94a3b8;padding:2px 0">Hava kirliliği</td><td><b style="color:${col}">AQI ${aqi}</b> — ${label}</td></tr>`;
+        if (typeof updateAQIBar === 'function') {
+            updateAQIBar(aqi, { label, color: col, emoji: '' });
         }
     }
 
     popup.setContent(`
         <div style="font-size:12px;line-height:1.45;min-width:230px;color:#e2e8f0">
             <div style="font-weight:bold;margin-bottom:4px">${icon} <span style="font-size:1.1em">${temp}°C</span>
-                <span style="opacity:.85;font-weight:500"> (hissedilen ${heatIndex}°C)</span></div>
+                <span style="opacity:.85;font-weight:500"> (hissedilen ${heatIdx}°C)</span></div>
             <div style="color:#94a3b8;margin-bottom:8px;text-transform:capitalize">${desc}</div>
             ${place ? `<div style="font-size:10px;color:#64748b;margin-bottom:6px">${place}</div>` : ''}
             <table style="width:100%;font-size:11px;border-collapse:collapse">
-                <tr><td style="color:#94a3b8;padding:2px 0">Basınç</td><td><b>${p != null ? Math.round(p) : ''}</b> mbar (hPa)</td></tr>
-                <tr><td style="color:#94a3b8">Nem</td><td><b>%${hum != null ? hum : ''}</b></td></tr>
-                <tr><td style="color:#94a3b8">Rüzgar</td><td><b>${wind.toFixed(1)}</b> km/s</td></tr>
-                <tr><td style="color:#94a3b8">Yağış (1 saat)</td><td><b>${rain1h.toFixed(1)}</b> mm/saat</td></tr>
+                <tr><td style="color:#94a3b8;padding:2px 0">Basınç</td><td><b>${p != null ? Math.round(p) : '—'}</b> mbar (hPa)</td></tr>
+                <tr><td style="color:#94a3b8">Nem</td><td><b>%${hum != null ? hum : '—'}</b></td></tr>
+                <tr><td style="color:#94a3b8">Rüzgâr</td><td><b>${wind.toFixed(1)}</b> km/s</td></tr>
+                <tr><td style="color:#94a3b8">Yağış (≈1 saat)</td><td><b>${rain1h.toFixed(1)}</b> mm/saat</td></tr>
                 ${aqiRow}
             </table>
-            <div style="font-size:9px;color:#64748b;margin-top:8px">${lat.toFixed(4)}, ${lng.toFixed(4)} | OpenWeatherMap</div>
+            <div style="font-size:9px;color:#64748b;margin-top:8px">${lat.toFixed(4)}, ${lng.toFixed(4)} · OpenWeatherMap</div>
         </div>
     `);
 }
 
-// OpenWeatherMap anlık hava (Current Weather API, metric + tr)
+// OpenWeatherMap — anlık hava (Current Weather API, metric + tr)
 async function fetchWeatherData(lat, lng) {
     try {
-        const response = await fetchWithRetry(
+        const response = await fetch(
             `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${CONFIG.WEATHER_API_KEY}&units=metric&lang=tr`
         );
         if (!response.ok) throw new Error('Weather API error');
         const data = await response.json();
-        if (window.STATE) {
-            window.STATE.lastWeatherData = data;
-        }
+        STATE.lastWeatherData = data;
         return data;
     } catch (error) {
         console.error('Hava durumu hatası:', error);
@@ -92,7 +90,7 @@ async function fetchWeatherData(lat, lng) {
 // OpenWeatherMap 5 günlük tahmin
 async function fetchWeatherForecast(lat, lng) {
     try {
-        const response = await fetchWithRetry(
+        const response = await fetch(
             `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lng}&appid=${CONFIG.WEATHER_API_KEY}&units=metric&lang=tr&cnt=16`
         );
         if (!response.ok) throw new Error('Forecast API error');
@@ -103,11 +101,11 @@ async function fetchWeatherForecast(lat, lng) {
     }
 }
 
-// AFAD ArcGIS FeatureServer deprem noktaları (resmi AFAD altyapısı)
-async function fetchAFADArcGSSeismic(limit = 200) {
+// AFAD ArcGIS FeatureServer — deprem noktaları (resmi AFAD altyapısı)
+async function fetchAFADArcGISSeismic(limit = 200) {
     try {
-        const url = `${CONFIG.AFAD_ARCGS_EARTHQUAKE}/query?f=geojson&where=mag>=2&outFields=time,latitude,longitude,depth,mag,place&returnGeometry=true&orderByFields=time+DESC&resultRecordCount=${limit}`;
-        const response = await fetchWithRetry(url);
+        const url = `${CONFIG.AFAD_ARCGIS_EARTHQUAKE}/query?f=geojson&where=mag>=2&outFields=time,latitude,longitude,depth,mag,place&returnGeometry=true&orderByFields=time+DESC&resultRecordCount=${limit}`;
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`AFAD ArcGIS ${response.status}`);
         const gj = await response.json();
         if (!gj.features || !Array.isArray(gj.features)) return null;
@@ -132,8 +130,8 @@ async function fetchAFADArcGSSeismic(limit = 200) {
     }
 }
 
-// NASA VIIRS NRT sıcak noktalar harita görünüm alanı için
-async function fetchFRMSHotspotsInBBox(west, south, east, north, limit = 600) {
+// NASA VIIRS NRT sıcak noktalar — harita görünüm alanı için
+async function fetchFIRMSHotspotsInBBox(west, south, east, north, limit = 600) {
     const pad = 0.15;
     west = Math.max(-180, west - pad);
     east = Math.min(180, east + pad);
@@ -141,8 +139,8 @@ async function fetchFRMSHotspotsInBBox(west, south, east, north, limit = 600) {
     north = Math.min(85, north + pad);
     const geom = `${west},${south},${east},${north}`;
     try {
-        const url = `${CONFIG.NASA_VRS_HOTSPOTS_LAYER}/query?f=geojson&where=1%3D1&geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=latitude,longitude,bright_ti4,frp,confidence,satellite,acq_date,daynight&returnGeometry=true&resultRecordCount=${limit}`;
-        const response = await fetchWithRetry(url);
+        const url = `${CONFIG.NASA_VIIRS_HOTSPOTS_LAYER}/query?f=geojson&where=1%3D1&geometry=${encodeURIComponent(geom)}&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=latitude,longitude,bright_ti4,frp,confidence,satellite,acq_date,daynight&returnGeometry=true&resultRecordCount=${limit}`;
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`VIIRS ${response.status}`);
         const gj = await response.json();
         if (!gj.features) return [];
@@ -161,7 +159,7 @@ async function fetchFRMSHotspotsInBBox(west, south, east, north, limit = 600) {
             };
         }).filter(h => !isNaN(h.lat) && !isNaN(h.lng));
     } catch (e) {
-        console.error('VIIRS/FRMS hotspots:', e);
+        console.error('VIIRS/FIRMS hotspots:', e);
         return [];
     }
 }
@@ -186,7 +184,7 @@ function dedupeEarthquakes(list) {
 
 async function fetchMergedEarthquakeList() {
     const [afad, kandilli] = await Promise.all([
-        fetchAFADArcGSSeismic(250),
+        fetchAFADArcGISSeismic(250),
         fetchKandilliData()
     ]);
     const raw = [...(afad || []), ...(kandilli || [])];
@@ -216,16 +214,13 @@ async function verifyKandilliSeismicNear(lat, lng) {
     try {
         data = await fetchKandilliData();
     } catch (e) {
-        console.error('Kandilli API hatası:', e);
         data = null;
     }
-
-    // API verisi alınamadıysa DOĞRULANMAMA NOTU EKLE
-    if (!data || !Array.isArray(data) || data.length === 0) {
+    if (!data || !data.length) {
         return {
-            verified: false,
-            reason: 'api_hata',
-            detail: 'Kandilli verisi alınamadı, doğrulama yapılamadı.'
+            verified: true,
+            reason: 'api_yok',
+            detail: 'Kandilli verisi alınamadı; güvenlik için yetkili bildirimi açık kabul edildi.'
         };
     }
 
@@ -241,32 +236,28 @@ async function verifyKandilliSeismicNear(lat, lng) {
         const dist = calculateDistance(lat, lng, eq.lat, eq.lng);
         const mag = parseFloat(eq.magnitude) || 0;
 
-        // Eşik değerini geçerse DOĞRULANMIŞ
         if (dist <= maxKm && mag >= minM) {
             return {
                 verified: true,
                 reason: 'kandilli_eslesti',
-                detail: `M${mag.toFixed(1)} ${Math.round(dist)} km ${eq.place || ''}`.trim()
+                detail: `M${mag.toFixed(1)} — ${Math.round(dist)} km — ${eq.place || ''}`.trim()
             };
         }
-
-        // En yakın kaydı tut
         if (!closest || dist < closest.dist) {
             closest = { dist, mag, place: eq.place, t };
         }
     }
 
-    // Eşik dışı kalmışsa DOĞRULANMAMA EKLE
     return {
         verified: false,
         reason: 'eslesme_yok',
         detail: closest
-            ? `Son kayıt: M${closest.mag?.toFixed(1)} ${Math.round(closest.dist)} km (eşik dışı veya süre dışı)`
+            ? `Son kayıt: M${closest.mag?.toFixed(1)} — ${Math.round(closest.dist)} km (eşik dışı veya süre dışı)`
             : `${maxH} saat / ${maxKm} km içinde eşleşen Kandilli kaydı yok`
     };
 }
 
-// USGS son ~24 saat (feed day) Türkiye kutusu + kullanıcıya yakın sayım
+// USGS son ~24 saat (feed “day”) — Türkiye kutusu + kullanıcıya yakın sayım
 async function fetchUSGSTurkeyAndLocalStats(userLat, userLng) {
     const bbox = CONFIG.TURKEY_BBOX;
     const res = {
@@ -277,7 +268,7 @@ async function fetchUSGSTurkeyAndLocalStats(userLat, userLng) {
     };
 
     try {
-        const response = await fetchWithRetry(`${CONFIG.EARTHQUAKE_API}2.5_day.geojson`);
+        const response = await fetch(`${CONFIG.EARTHQUAKE_API}2.5_day.geojson`);
         if (!response.ok) throw new Error('USGS');
         const geo = await response.json();
         const features = geo.features || [];
@@ -297,7 +288,7 @@ async function fetchUSGSTurkeyAndLocalStats(userLat, userLng) {
             if (!inTurkey) continue;
 
             res.turkeyCount++;
-            const dist = typeof calculateDistance === 'function' ? calculateDistance(userLat, userLng, la, lng) : 999;
+            const dist = calculateDistance(userLat, userLng, la, lng);
             if (dist <= 200) res.within200km++;
 
             const place = (p.place || 'Bilinmiyor').split(',').map(s => s.trim());
@@ -318,11 +309,11 @@ async function fetchUSGSTurkeyAndLocalStats(userLat, userLng) {
 // Kandilli Rasathanesi - GERÇEK VERİ (birincil kaynak)
 async function fetchKandilliData() {
     try {
-        const response = await fetchWithRetry(CONFIG.KANDILLI_API);
+        const response = await fetch(CONFIG.KANDILLI_API);
         if (!response.ok) throw new Error(`Kandilli API ${response.status}`);
         const data = await response.json();
 
-        // Kandilli API format: {status: true, result: [{earthquake_id, title, date, time, mag, depth, lng, lat}]}
+        // Kandilli API formatı: {status: true, result: [{earthquake_id, title, date, time, mag, depth, lng, lat}]}
         if (!data.status || !Array.isArray(data.result)) {
             throw new Error('Geçersiz Kandilli yanıtı');
         }
@@ -346,7 +337,7 @@ async function fetchKandilliData() {
 // USGS Deprem verileri (yedek kaynak)
 async function fetchEarthquakeData(minMagnitude = 2.5) {
     try {
-        const response = await fetchWithRetry(
+        const response = await fetch(
             `${CONFIG.EARTHQUAKE_API}${minMagnitude}_day.geojson`
         );
         if (!response.ok) throw new Error('Earthquake API error');
@@ -375,7 +366,7 @@ async function fetchEarthquakeData(minMagnitude = 2.5) {
 async function fetchOSRMRoute(startLat, startLng, endLat, endLng) {
     try {
         const url = `${CONFIG.OSRM_API}/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
-        const response = await fetchWithRetry(url);
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`OSRM ${response.status}`);
         const data = await response.json();
 
@@ -407,7 +398,7 @@ function calculateHeatIndex(tempC, humidity) {
     if (T < 80) return Math.round(tempC); // 27°C altında düzeltme gerekmez
 
     const RH = humidity;
-    const H_F = -42.379
+    const HI_F = -42.379
         + 2.04901523 * T
         + 10.14333127 * RH
         - 0.22475541 * T * RH
@@ -417,49 +408,46 @@ function calculateHeatIndex(tempC, humidity) {
         + 0.00085282 * T * RH * RH
         - 0.00000199 * T * T * RH * RH;
 
-    return Math.round((H_F - 32) * 5 / 9);
+    return Math.round((HI_F - 32) * 5 / 9);
 }
 
 // Overpass API - Yakın birimleri bul
 async function fetchNearbyUnits(lat, lng, radius = 10000) {
-        // Daha geniş arama için radius'u artır (10km -> 25km)
-        const searchRadius = Math.max(radius, 25000);
-
         const query = `
-        [out:json][timeout:60];
+        [out:json][timeout:40];
         (
-            node["amenity"="hospital"](around:${searchRadius},${lat},${lng});
-            node["amenity"="clinic"](around:${searchRadius},${lat},${lng});
-            node["amenity"="doctors"](around:${searchRadius},${lat},${lng});
-            node["amenity"="police"](around:${searchRadius},${lat},${lng});
-            node["amenity"="fire_station"](around:${searchRadius},${lat},${lng});
-            node["amenity"="emergency_ambulance_station"](around:${searchRadius},${lat},${lng});
-            node["social_facility"="assembly_point"](around:${searchRadius},${lat},${lng});
-            node["emergency"="assembly_point"](around:${searchRadius},${lat},${lng});
-            node["leisure"="park"](around:${searchRadius},${lat},${lng});
-            node["amenity"="school"](around:${searchRadius},${lat},${lng});
-            node["place"="square"](around:${searchRadius},${lat},${lng});
-            node["amenity"="townhall"](around:${searchRadius},${lat},${lng});
-            node["office"="government"](around:${searchRadius},${lat},${lng});
-            node["military"="office"](around:${searchRadius},${lat},${lng});
-            node["military"="barracks"](around:${searchRadius},${lat},${lng});
-            way["amenity"="hospital"](around:${searchRadius},${lat},${lng});
-            way["amenity"="police"](around:${searchRadius},${lat},${lng});
-            way["amenity"="fire_station"](around:${searchRadius},${lat},${lng});
-            way["leisure"="park"](around:${searchRadius},${lat},${lng});
-            way["amenity"="school"](around:${searchRadius},${lat},${lng});
-            way["emergency"="assembly_point"](around:${searchRadius},${lat},${lng});
-            way["amenity"="townhall"](around:${searchRadius},${lat},${lng});
-            way["office"="government"](around:${searchRadius},${lat},${lng});
-            way["military"="office"](around:${searchRadius},${lat},${lng});
-            way["military"="barracks"](around:${searchRadius},${lat},${lng});
-            relation["amenity"="hospital"](around:${searchRadius},${lat},${lng});
+            node["amenity"="hospital"](around:${radius},${lat},${lng});
+            node["amenity"="clinic"](around:${radius},${lat},${lng});
+            node["amenity"="doctors"](around:${radius},${lat},${lng});
+            node["amenity"="police"](around:${radius},${lat},${lng});
+            node["amenity"="fire_station"](around:${radius},${lat},${lng});
+            node["amenity"="emergency_ambulance_station"](around:${radius},${lat},${lng});
+            node["social_facility"="assembly_point"](around:${radius},${lat},${lng});
+            node["emergency"="assembly_point"](around:${radius},${lat},${lng});
+            node["leisure"="park"](around:${radius},${lat},${lng});
+            node["amenity"="school"](around:${radius},${lat},${lng});
+            node["place"="square"](around:${radius},${lat},${lng});
+            node["amenity"="townhall"](around:${radius},${lat},${lng});
+            node["office"="government"](around:${radius},${lat},${lng});
+            node["military"="office"](around:${radius},${lat},${lng});
+            node["military"="barracks"](around:${radius},${lat},${lng});
+            way["amenity"="hospital"](around:${radius},${lat},${lng});
+            way["amenity"="police"](around:${radius},${lat},${lng});
+            way["amenity"="fire_station"](around:${radius},${lat},${lng});
+            way["leisure"="park"](around:${radius},${lat},${lng});
+            way["amenity"="school"](around:${radius},${lat},${lng});
+            way["emergency"="assembly_point"](around:${radius},${lat},${lng});
+            way["amenity"="townhall"](around:${radius},${lat},${lng});
+            way["office"="government"](around:${radius},${lat},${lng});
+            way["military"="office"](around:${radius},${lat},${lng});
+            way["military"="barracks"](around:${radius},${lat},${lng});
+            relation["amenity"="hospital"](around:${radius},${lat},${lng});
         );
         out center;
     `;
 
     try {
-        const response = await fetchWithRetry(CONFIG.OVERPASS_API + '?data=' + encodeURIComponent(query));
+        const response = await fetch(CONFIG.OVERPASS_API + '?data=' + encodeURIComponent(query));
         if (!response.ok) throw new Error('Overpass API error');
         const data = await response.json();
 
@@ -485,7 +473,8 @@ async function fetchNearbyUnits(lat, lng, radius = 10000) {
 }
 
 /**
- * OpenStreetMap Overpass görünür alan (bbox) içindeki şehir / kasaba / büyük yerleşim (place=*).
+ * OpenStreetMap Overpass — görünür alan (bbox) içindeki şehir / kasaba / büyük yerleşim (place=*).
+ * Kaynak: © OpenStreetMap contributors — https://www.openstreetmap.org/copyright
  */
 async function fetchPlacesInBBox(south, west, north, east, limit = 55) {
     south = Number(south);
@@ -515,7 +504,7 @@ out center ${outN};
 `;
 
     try {
-        const response = await fetchWithRetry(CONFIG.OVERPASS_API + '?data=' + encodeURIComponent(query));
+        const response = await fetch(CONFIG.OVERPASS_API + '?data=' + encodeURIComponent(query));
         if (!response.ok) throw new Error('Overpass places ' + response.status);
         const data = await response.json();
         if (!data.elements || !Array.isArray(data.elements)) return [];
@@ -551,40 +540,28 @@ function categorizeUnit(tags) {
     if (tags.emergency === 'assembly_point') return 'assembly';
     if (tags.social_facility === 'assembly_point') return 'assembly';
 
-    // Sağlık kurumları - genişletilmiş
     if (tags.amenity === 'hospital') return 'hospital';
     if (tags.amenity === 'clinic') return 'hospital';
     if (tags.amenity === 'doctors') return 'hospital';
-    if (tags.amenity === 'dentist') return 'hospital';
-    if (tags.amenity === 'pharmacy') return 'hospital';
 
     if (tags.amenity === 'fire_station') return 'fire';
-    if (tags.emergency === 'ambulance_station') return 'ambulance';
+    if (tags.amenity === 'emergency_ambulance_station') return 'ambulance';
 
     if (tags.amenity === 'police') {
         if (name.includes('jandarma') || name.includes('gendarmerie')) return 'gendarmerie';
         return 'police';
     }
 
-    // Askeri kurumlar
     if (tags.military === 'office' || tags.military === 'barracks') {
         if (name.includes('jandarma') || name.includes('gendarmerie')) return 'gendarmerie';
         return 'military';
     }
-    if (tags.amenity === 'ranger_station') return 'military';
 
-    // Kamu kurumları
-    if (tags.amenity === 'townhall') return 'government';
-    if (tags.amenity === 'community_centre') return 'government';
-    if (tags.office === 'government') return 'government';
+    if (tags.amenity === 'townhall' || tags.office === 'government') return 'government';
 
     if (tags.leisure === 'park') return 'park';
-    if (tags.leisure === 'garden') return 'park';
     if (tags.amenity === 'school') return 'school';
-    if (tags.amenity === 'university') return 'school';
-    if (tags.amenity === 'college') return 'school';
     if (tags.place === 'square') return 'square';
-    if (tags.landuse === 'recreation_ground') return 'park';
     return 'unknown';
 }
 
@@ -606,7 +583,7 @@ function applyRiskMeterClasses(risks) {
 }
 
 function notifyCitizenEnvironmentalRisks(risks, lat, lng, extras) {
-    if (window.STATE?.userRole === 'admin') return;
+    if (STATE.userRole === 'admin') return;
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
     const now = Date.now();
@@ -617,8 +594,8 @@ function notifyCitizenEnvironmentalRisks(risks, lat, lng, extras) {
         if (now - parseInt(sessionStorage.getItem(k) || '0', 10) > minGap) {
             sessionStorage.setItem(k, String(now));
             sendNotification(
-                'TR-GÖZÜ Yangın Riski',
-                `Bölgenize yakın uydu (VIIRS) ile ${extras.fireHotspots} sıcak nokta tespit edildi. Dikkatli olun!`,
+                'TR-GOZU — Yangın riski',
+                `Bölgenize yakın uydu (VIIRS) ile ${extras.fireHotspots} sıcak nokta tespit edildi. Dikkatli olun; 110`,
                 { tag: 'trgozu-fire', requireInteraction: false }
             );
         }
@@ -629,8 +606,8 @@ function notifyCitizenEnvironmentalRisks(risks, lat, lng, extras) {
         if (now - parseInt(sessionStorage.getItem(k) || '0', 10) > minGap) {
             sessionStorage.setItem(k, String(now));
             sendNotification(
-                'TR-GÖZÜ Yoğun Yağış',
-                `Son saat yağış tahmini yüksek (~${extras.rain1h.toFixed(1)} mm). Sel riskine karşı dikkatli olun.`,
+                'TR-GOZU — Yoğun yağış',
+                `Son saat yağış tahmini yüksek (~${extras.rain1h.toFixed(1)} mm). Sel riskine karşı yüksek zemine çıkın.`,
                 { tag: 'trgozu-rain', requireInteraction: false }
             );
         }
@@ -641,8 +618,8 @@ function notifyCitizenEnvironmentalRisks(risks, lat, lng, extras) {
         if (now - parseInt(sessionStorage.getItem(k) || '0', 10) > minGap) {
             sessionStorage.setItem(k, String(now));
             sendNotification(
-                'TR-GÖZÜ Deprem Riski',
-                'Konumunuza yakın sismik aktivite yüksek. Güvenli alana geçin.',
+                'TR-GOZU — Deprem riski',
+                'Konumunuza yakın sismik aktivite yüksek. Güvenli alana geçin; çök-kapan-tutun.',
                 { tag: 'trgozu-eq', requireInteraction: false }
             );
         }
@@ -655,20 +632,18 @@ async function performRiskAnalysis(lat, lng) {
     const extras = { rain1h: 0, fireHotspots: 0, pressure: null };
 
     const usgsStats = await fetchUSGSTurkeyAndLocalStats(lat, lng);
-    if (window.STATE) {
-        window.STATE.usgs24hSummary = usgsStats;
-    }
+    STATE.usgs24hSummary = usgsStats;
 
     const usgsEl = document.getElementById('val-usgs-24h');
     if (usgsEl) {
         const topR = Object.entries(usgsStats.byPlace || {}).sort((a, b) => b[1] - a[1]).slice(0, 4);
-        const regStr = topR.length ? topR.map(([n, c]) => `${n}: ${c}`).join('  ') : 'bölge sayımı yok';
-        usgsEl.textContent = `USGS 24s TR: ${usgsStats.turkeyCount} olay | 200 km sizden: ${usgsStats.within200km} | ${regStr}`;
+        const regStr = topR.length ? topR.map(([n, c]) => `${n}: ${c}`).join(' · ') : 'bölge sayımı yok';
+        usgsEl.textContent = `USGS 24s TR: ${usgsStats.turkeyCount} olay | ±200 km sizden: ${usgsStats.within200km} | ${regStr}`;
     }
 
     risks.earthquake = Math.min(45, (usgsStats.within200km || 0) * 9);
 
-    // 1. Hava durumu
+    // 1. Hava durumu — yalnız OpenWeather (yağış, basınç mbar, nem, rüzgar)
     const weather = await fetchWeatherData(lat, lng);
     if (weather) {
         const windSpeed = weather.wind.speed * 3.6;
@@ -682,9 +657,7 @@ async function performRiskAnalysis(lat, lng) {
             ? Number(weather.rain['1h'] ?? weather.rain['1H'])
             : (weather.rain && weather.rain['3h'] != null) ? Number(weather.rain['3h']) / 3 : 0;
         extras.rain1h = rain1h;
-        if (window.STATE) {
-            window.STATE.lastWeatherRainMm = rain1h;
-        }
+        STATE.lastWeatherRainMm = rain1h;
 
         risks.storm = Math.min(100, Math.round((windSpeed / 100) * 100));
         if (pressure != null && pressure < 1005) {
@@ -713,30 +686,29 @@ async function performRiskAnalysis(lat, lng) {
         }
     }
 
-    // VIIRS sıcak nokta yoğunluğu
+    // VIIRS sıcak nokta yoğunluğu (yangın görünürlüğü)
     let hotspots = [];
     try {
         const pad = 0.5;
-        hotspots = await fetchFRMSHotspotsInBBox(
+        hotspots = await fetchFIRMSHotspotsInBBox(
             lng - pad, lat - pad, lng + pad, lat + pad, 400
         );
     } catch (e) {
         hotspots = [];
     }
-    const localFires = hotspots.filter(h => typeof calculateDistance === 'function' ? calculateDistance(lat, lng, h.lat, h.lng) <= 85 : false);
+    const localFires = hotspots.filter(h => calculateDistance(lat, lng, h.lat, h.lng) <= 85);
     extras.fireHotspots = localFires.length;
-    if (window.STATE) {
-        window.STATE.lastFireHotspotCount = localFires.length;
-    }
+    STATE.lastFireHotspotCount = localFires.length;
     const frpScore = Math.min(55, localFires.reduce((s, h) => s + (h.frp || 0) * 4, 0));
     const countScore = Math.min(45, localFires.length * 12);
     risks.fire = Math.min(100, Math.max(risks.fire, frpScore + countScore));
 
-    // 2. Deprem
+    // 2. Deprem — yakın olaylar: AFAD+Kandilli; USGS skor yukarıda eklendi
     let earthquakeList = await fetchMergedEarthquakeList();
     let dataSource = 'AFAD + Kandilli';
 
     if (!earthquakeList || earthquakeList.length === 0) {
+        console.warn('Birleşik deprem listesi boş, USGS yedek kullanılıyor...');
         earthquakeList = await fetchEarthquakeData(2.5);
         dataSource = 'USGS';
     }
@@ -748,7 +720,7 @@ async function performRiskAnalysis(lat, lng) {
 
         earthquakeList.forEach(eq => {
             if (!eq.lat || !eq.lng || isNaN(eq.lat) || isNaN(eq.lng)) return;
-            const distance = typeof calculateDistance === 'function' ? calculateDistance(lat, lng, eq.lat, eq.lng) : 999;
+            const distance = calculateDistance(lat, lng, eq.lat, eq.lng);
 
             if (distance < minDistance) {
                 minDistance = distance;
@@ -775,16 +747,14 @@ async function performRiskAnalysis(lat, lng) {
             visibleEqs.forEach(eq => addEarthquakeMarker(eq));
         }
 
-        if (window.STATE) {
-            window.STATE.nearbyEarthquakes = nearbyEarthquakes;
-        }
+        STATE.nearbyEarthquakes = nearbyEarthquakes;
 
         const trendEl = document.getElementById('val-deprem-trend');
         if (trendEl) {
-            trendEl.textContent = `USGS TR 24s: ${usgsStats.turkeyCount} | 200 km: ${usgsStats.within200km}`;
+            trendEl.textContent = `USGS TR 24s: ${usgsStats.turkeyCount} | ±200 km: ${usgsStats.within200km}`;
         }
     } else {
-        if (window.STATE) window.STATE.nearbyEarthquakes = [];
+        STATE.nearbyEarthquakes = [];
     }
 
     if (weather && typeof loadForecast === 'function') {
@@ -802,17 +772,17 @@ async function performRiskAnalysis(lat, lng) {
 
     const heurEl = document.getElementById('val-seismic-heuristic');
     if (heurEl) {
-        const nNear = Array.isArray(window.STATE?.nearbyEarthquakes)
-            ? window.STATE.nearbyEarthquakes.length
+        const nNear = Array.isArray(STATE.nearbyEarthquakes)
+            ? STATE.nearbyEarthquakes.length
             : 0;
-        const nearEq = window.STATE?.nearbyEarthquakes?.[0];
+        const nearEq = STATE.nearbyEarthquakes && STATE.nearbyEarthquakes[0];
         const magStr = nearEq && nearEq.magnitude != null
             ? `En yakın kayıt: M${Number(nearEq.magnitude).toFixed(1)} (~${Math.round(nearEq.distance || 0)} km). `
             : '';
         heurEl.textContent =
             'Deprem yüzdeleri bilimsel tahmin değildir; AFAD / Kandilli / USGS akışına dayalı özet skordur. ' +
             magStr +
-            `Son taramada yakınınızda (300 km) ${nNear} olay listelendi.`;
+            `Son taramada yakınınızda (≈300 km) ${nNear} olay listelendi. Resmî uyarılar için Kandilli ve AFAD’ı takip edin.`;
     }
 
     notifyCitizenEnvironmentalRisks(risks, lat, lng, extras);
@@ -822,7 +792,7 @@ async function performRiskAnalysis(lat, lng) {
     return risks;
 }
 
-// Hava durumu UI güncelle
+// Hava durumu UI güncelle (OpenWeather: yağış ve basınç ayrı)
 function updateWeatherUI(weather, rain1hOverride, pressureOverride) {
     const belediyeEl = document.getElementById('val-belediye');
     const havaEl = document.getElementById('val-hava');
@@ -831,10 +801,10 @@ function updateWeatherUI(weather, rain1hOverride, pressureOverride) {
 
     if (havaEl) {
         const temp = Math.round(weather.main.temp);
-        const heatIndex = typeof calculateHeatIndex === 'function' ? calculateHeatIndex(temp, weather.main.humidity) : temp;
+        const heatIdx = calculateHeatIndex(temp, weather.main.humidity);
         const desc = weather.weather[0].description;
-        const icon = typeof getWeatherIcon === 'function' ? getWeatherIcon(weather.weather[0].main) : '';
-        havaEl.textContent = `${icon} ${temp}°C (his: ${heatIndex}°C), ${desc}`;
+        const icon = getWeatherIcon(weather.weather[0].main);
+        havaEl.textContent = `${icon} ${temp}°C (his: ${heatIdx}°C), ${desc}`;
     }
 
     const rainMm = rain1hOverride != null ? rain1hOverride : (
@@ -843,18 +813,18 @@ function updateWeatherUI(weather, rain1hOverride, pressureOverride) {
             : (weather.rain && weather.rain['3h'] != null) ? Number(weather.rain['3h']) / 3 : 0
     );
     const yagisEl = document.getElementById('val-yagis-mm');
-    if (yagisEl) yagisEl.textContent = `${rainMm.toFixed(1)} mm/saat`;
+    if (yagisEl) yagisEl.textContent = `${rainMm.toFixed(1)} mm/saat (OpenWeather)`;
 
     const p = pressureOverride != null ? pressureOverride : weather.main.pressure;
-    const basEl = document.getElementById('val-basin-mbar');
-    if (basEl) basEl.textContent = p != null ? `${Math.round(p)} mbar` : '-';
+    const basEl = document.getElementById('val-basinç-mbar');
+    if (basEl) basEl.textContent = p != null ? `${Math.round(p)} mbar (hPa)` : '-';
 }
 
 // Deprem UI güncelle
 function updateEarthquakeUI(eq, source) {
-    const eqnfoEl = document.getElementById('val-deprem-son');
-    if (eqnfoEl) {
-        eqnfoEl.textContent = `M${eq.magnitude.toFixed(1)} ${eq.place || 'Bilinmiyor'} (${Math.round(eq.distance)} km) [${source}]`;
+    const eqInfoEl = document.getElementById('val-deprem-son');
+    if (eqInfoEl) {
+        eqInfoEl.textContent = `M${eq.magnitude.toFixed(1)} — ${eq.place || 'Bilinmiyor'} (${Math.round(eq.distance)} km) [${source}]`;
     }
 }
 
@@ -874,7 +844,7 @@ function updateRiskUI(risks) {
     if (locStatusEl) {
         if (risks.overall === 'critical') {
             locStatusEl.innerHTML = '<span class="text-danger">KRİTİK RİSK TESPİT EDİLDİ!</span>';
-            if (window.STATE?.userRole === 'admin') playSound('alert');
+            if (STATE.userRole === 'admin') playSound('alert');
         } else if (risks.overall === 'high') {
             locStatusEl.innerHTML = '<span class="text-warning">YÜKSEK RİSK</span>';
         } else {
@@ -891,7 +861,7 @@ const EMERGENCY_TYPE_TR = {
     square: 'Meydan'
 };
 
-// Risk paneli: 5 km içindeki kurumlar için <select> doldur
+// Risk paneli: 5 km (CONFIG.INSTITUTION_LIST_RADIUS_KM) içindeki kurumlar için <select> doldur
 function fillEmergencyTargetSelects() {
     const rKm = CONFIG.INSTITUTION_LIST_RADIUS_KM != null ? Number(CONFIG.INSTITUTION_LIST_RADIUS_KM) : 5;
 
@@ -912,101 +882,143 @@ function fillEmergencyTargetSelects() {
             const opt = document.createElement('option');
             opt.value = String(i);
             const tag = EMERGENCY_TYPE_TR[u.type] || u.type || '';
-            opt.textContent = `${u.name || 'İsimsiz'} | ${tag} (${u.distance.toFixed(1)} km)`;
+            opt.textContent = `${u.name || 'İsimsiz'} — ${tag} (${u.distance.toFixed(1)} km)`;
             sel.appendChild(opt);
         });
         sel.selectedIndex = 0;
     };
 
-    if (window.STATE) {
-        fillOne('select-hospital-5km', window.STATE.hospitalsWithin5km, `${rKm} km içinde sağlık kuruluşu yok`);
-        fillOne('select-assembly-5km', window.STATE.assembliesWithin5km, `${rKm} km içinde toplanma alanı yok`);
-    }
+    fillOne(
+        'select-hospital-5km',
+        STATE.hospitalsWithin5km,
+        `${rKm} km içinde sağlık kuruluşu yok (OSM)`
+    );
+    fillOne(
+        'select-assembly-5km',
+        STATE.assembliesWithin5km,
+        `${rKm} km içinde toplanma / güvenli alan yok (OSM)`
+    );
 }
 
-// Acil birimleri bul
+// Acil birimleri bul — haritada geniş alan; panelde yalnız yarıçap içi liste + varsayılan en yakın
 async function fetchEmergencyUnits(lat, lng) {
-    if (!window.STATE) return { assembly: null, hospital: null };
     const rKm = CONFIG.INSTITUTION_LIST_RADIUS_KM != null ? Number(CONFIG.INSTITUTION_LIST_RADIUS_KM) : 5;
     const units = await fetchNearbyUnits(lat, lng, 20000);
 
-    const institutionTypes = [
-        { type: 'hospital', stateKey: 'hospitalsWithin5km' },
-        { type: 'police', stateKey: 'policeWithin5km' },
-        { type: 'fire', stateKey: 'fireWithin5km' },
-        { type: 'ambulance', stateKey: 'ambulanceWithin5km' },
-        { type: 'gendarmerie', stateKey: 'gendarmerieWithin5km' },
-        { type: 'military', stateKey: 'militaryWithin5km' },
-        { type: 'government', stateKey: 'governmentWithin5km' },
-        { types: ['assembly', 'park', 'school', 'square'], stateKey: 'assembliesWithin5km' }
-    ];
+    const hospitalsAll = units
+        .filter((u) => u.type === 'hospital')
+        .map((u) => ({
+            ...u,
+            distance: calculateDistance(lat, lng, u.lat, u.lng)
+        }))
+        .sort((a, b) => a.distance - b.distance);
 
-    institutionTypes.forEach(({ type, types, stateKey }) => {
-        const filterTypes = types || [type];
-        const allUnits = units
-            .filter((u) => filterTypes.includes(u.type))
-            .map((u) => ({
-                ...u,
-                distance: typeof calculateDistance === 'function' ? calculateDistance(lat, lng, u.lat, u.lng) : 999
-            }))
-            .sort((a, b) => a.distance - b.distance);
+    const assembliesAll = units
+        .filter((u) =>
+            ['assembly', 'park', 'school', 'square'].includes(u.type)
+        )
+        .map((u) => ({
+            ...u,
+            distance: calculateDistance(lat, lng, u.lat, u.lng)
+        }))
+        .sort((a, b) => a.distance - b.distance);
 
-        const withinRadius = allUnits.filter((u) => u.distance <= rKm);
-        window.STATE[stateKey] = withinRadius;
+    const hospitals = hospitalsAll.filter((u) => u.distance <= rKm);
+    const assemblies = assembliesAll.filter((u) => u.distance <= rKm);
 
-        const nearestKey = `nearest${(type || types[0]).charAt(0).toUpperCase() + (type || types[0]).slice(1)}`;
-        window.STATE[nearestKey] = allUnits[0] || null;
-    });
+    STATE.hospitalsWithin5km = hospitals;
+    STATE.assembliesWithin5km = assemblies;
+    STATE.selectedHospitalIndex = 0;
+    STATE.selectedAssemblyIndex = 0;
 
-    window.STATE.selectedHospitalIndex = 0;
-    window.STATE.selectedAssemblyIndex = 0;
+    const hospital = hospitals[0] || null;
+    const assembly = assemblies[0] || null;
+
+    STATE.nearestHospital = hospital;
+    STATE.nearestAssembly = assembly;
 
     fillEmergencyTargetSelects();
 
-    if (window.STATE.nearestHospital) {
-        updateUIBox('hospitalBox', 'val-hastane', 'val-hastane-mesafe', window.STATE.nearestHospital.name, window.STATE.nearestHospital.distance.toFixed(1) + ' km');
+    if (hospital) {
+        updateUI(
+            'hospitalBox',
+            'val-hastane',
+            'val-hastane-mesafe',
+            hospital.name,
+            hospital.distance.toFixed(1) + ' km'
+        );
+    } else {
+        const hb = document.getElementById('hospitalBox');
+        if (hb) {
+            hb.classList.remove('hidden');
+            const n = document.getElementById('val-hastane');
+            const d = document.getElementById('val-hastane-mesafe');
+            if (n) n.textContent = `${rKm} km içinde bulunamadı`;
+            if (d) d.textContent = '-';
+        }
     }
 
-    if (window.STATE.nearestAssembly) {
-        updateUIBox('assemblyBox', 'val-toplanma-ad', 'val-toplanma-mesafe', window.STATE.nearestAssembly.name, window.STATE.nearestAssembly.distance.toFixed(1) + ' km');
+    if (assembly) {
+        updateUI(
+            'assemblyBox',
+            'val-toplanma-ad',
+            'val-toplanma-mesafe',
+            assembly.name,
+            assembly.distance.toFixed(1) + ' km'
+        );
+    } else {
+        const ab = document.getElementById('assemblyBox');
+        if (ab) {
+            ab.classList.remove('hidden');
+            const n = document.getElementById('val-toplanma-ad');
+            const d = document.getElementById('val-toplanma-mesafe');
+            if (n) n.textContent = `${rKm} km içinde bulunamadı`;
+            if (d) d.textContent = '-';
+        }
     }
 
     units.forEach((u) => {
         if (typeof addUnitMarker === 'function') addUnitMarker(u);
     });
 
-    return { assembly: window.STATE.nearestAssembly, hospital: window.STATE.nearestHospital };
+    return { assembly, hospital };
 }
 
-function updateUIBox(boxId, nameId, distId, name, dist) {
+// UI güncelle
+function updateUI(boxId, nameId, distId, name, dist) {
     const box = document.getElementById(boxId);
     if (box) box.classList.remove('hidden');
+
     const nameEl = document.getElementById(nameId);
     const distEl = document.getElementById(distId);
     if (nameEl) nameEl.textContent = name;
-    if (distEl) distEl.textContent = dist;
+    if (distEl && dist) distEl.textContent = dist;
 }
 
 // Konum tabanlı öncelik hesapla
 async function calculateLocationPriority(lat, lng) {
     const citizens = getCitizens();
+    let nearbyCount = 0;
     let sosCount = 0;
 
     citizens.forEach(c => {
         if (c.lat && c.lng) {
-            const dist = typeof calculateDistance === 'function' ? calculateDistance(lat, lng, c.lat, c.lng) : 999;
-            if (dist <= 1 && (c.isSOS || c.isPanic)) {
-                sosCount++;
+            const dist = calculateDistance(lat, lng, c.lat, c.lng);
+            if (dist <= 1) {
+                nearbyCount++;
+                if (c.isSOS || c.isPanic) sosCount++;
             }
         }
     });
 
     let priority = 'low';
-    if (sosCount >= CONFIG.PRIORITY_THRESHOLDS?.CRITICAL) priority = 'critical';
-    else if (sosCount >= CONFIG.PRIORITY_THRESHOLDS?.HIGH) priority = 'high';
-    else if (sosCount >= CONFIG.PRIORITY_THRESHOLDS?.MEDIUM) priority = 'medium';
+    if (sosCount >= CONFIG.PRIORITY_THRESHOLDS.CRITICAL) priority = 'critical';
+    else if (sosCount >= CONFIG.PRIORITY_THRESHOLDS.HIGH) priority = 'high';
+    else if (sosCount >= CONFIG.PRIORITY_THRESHOLDS.MEDIUM) priority = 'medium';
 
-    return { priority, sosCount };
+    return { priority, nearbyCount, sosCount,
+        riskLevel: sosCount >= 10 ? 'extreme' : sosCount >= 5 ? 'high' : sosCount >= 3 ? 'medium' : 'low'
+    };
 }
 
 // Tüm vatandaşları al
@@ -1018,16 +1030,15 @@ function getCitizens() {
 function updateCitizen(email, data) {
     const citizens = getCitizens();
     const index = citizens.findIndex(c => c.email === email);
-    const now = new Date().toISOString();
 
     if (index >= 0) {
-        citizens[index] = { ...citizens[index], ...data, lastActive: now };
+        citizens[index] = { ...citizens[index], ...data, lastActive: new Date().toISOString() };
     } else {
         citizens.push({
             email,
             ...data,
-            createdAt: now,
-            lastActive: now
+            createdAt: new Date().toISOString(),
+            lastActive: new Date().toISOString()
         });
     }
 
@@ -1040,11 +1051,13 @@ function getSOSList() {
     return getFromStorage('sosList', []);
 }
 
-// SOS ekle
+// SOS ekle (meta: forwardToAuthority, kandilliCheck — Kandilli doğrulaması)
 function addSOS(email, lat, lng, isPanic = false, meta = {}) {
-    const forwardToAuthority = meta.forwardToAuthority !== undefined ? !!meta.forwardToAuthority : true;
+    const forwardToAuthority = meta.forwardToAuthority !== undefined
+        ? !!meta.forwardToAuthority
+        : true;
+
     const sosList = getSOSList();
-    const now = new Date().toISOString();
     const sos = {
         id: generateId(),
         user: email,
@@ -1052,7 +1065,7 @@ function addSOS(email, lat, lng, isPanic = false, meta = {}) {
         lng,
         isPanic,
         isVerified: false,
-        time: now,
+        time: new Date().toISOString(),
         forwardToAuthority,
         kandilliCheck: meta.kandilliCheck || null
     };
@@ -1062,7 +1075,7 @@ function addSOS(email, lat, lng, isPanic = false, meta = {}) {
     updateCitizen(email, {
         isSOS: true,
         isPanic: !!isPanic,
-        sosTime: now,
+        sosTime: sos.time,
         lastSOSForward: forwardToAuthority
     });
     return sos;

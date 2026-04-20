@@ -1,12 +1,12 @@
-﻿// TR-GÖZÜ Gönüllü Modülü
+// TR-GOZU Gönüllü Modülü
 
 // Gönüllü modalını aç
-window.openVolunteerModal = function() {
+function openVolunteerModal() {
     document.getElementById('volunteerModal').classList.remove('hidden');
 }
 
 // Gönüllü modalını kapat
-window.closeVolunteerModal = function() {
+function closeVolunteerModal() {
     document.getElementById('volunteerModal').classList.add('hidden');
     // Formu temizle
     document.getElementById('volName').value = '';
@@ -16,7 +16,7 @@ window.closeVolunteerModal = function() {
 }
 
 // Gönüllü kaydet
-window.submitVolunteer = function() {
+function submitVolunteer() {
     const name = document.getElementById('volName').value.trim();
     const email = document.getElementById('volEmail').value.trim();
     const phone = document.getElementById('volPhone').value.trim();
@@ -43,9 +43,9 @@ window.submitVolunteer = function() {
         email,
         phone,
         skill,
-        skillLabel: CONFIG.VOLUNTEER_SKILLS?.[skill]?.label || skill,
+        skillLabel: CONFIG.VOLUNTEER_SKILLS[skill]?.label || skill,
         registeredAt: new Date().toISOString(),
-        location: window.STATE?.currentLocation
+        location: STATE.currentLocation
     };
 
     // Gönüllüleri kaydet
@@ -82,10 +82,10 @@ function loadVolunteerList() {
         <div class="volunteer-card">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-weight: 600;">${escapeHtml(v.name)}</span>
-                <span>${CONFIG.VOLUNTEER_SKILLS[v.skill]?.icon || ''}</span>
+                <span>${CONFIG.VOLUNTEER_SKILLS[v.skill]?.icon || '📍'}</span>
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-                ${v.skillLabel || v.skill}  ${v.phone}
+                ${v.skillLabel || v.skill} • ${v.phone}
             </div>
             ${v.location ? `
                 <button class="btn btn-outline btn-sm" style="margin-top: 8px; padding: 6px 10px;"
@@ -121,16 +121,16 @@ function loadAdminVolunteerList() {
         <div class="volunteer-card" onclick="flyToLocation(${v.location?.lat || 0}, ${v.location?.lng || 0})">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <strong>${escapeHtml(v.name)}</strong>
-                <span style="font-size: 1.2rem;">${CONFIG.VOLUNTEER_SKILLS[v.skill]?.icon || ''}</span>
+                <span style="font-size: 1.2rem;">${CONFIG.VOLUNTEER_SKILLS[v.skill]?.icon || '📍'}</span>
             </div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
                 ${v.skillLabel || v.skill}<br>
-                 ${v.email}<br>
-                 ${v.phone}
+                📧 ${v.email}<br>
+                📱 ${v.phone}
             </div>
             ${v.location ? `
                 <div style="font-size: 10px; color: var(--success); margin-top: 4px;">
-                     Konum paylaştı
+                    📍 Konum paylaştı
                 </div>
             ` : ''}
         </div>
@@ -155,4 +155,3 @@ function findNearbyVolunteers(lat, lng, radiusKm = 10) {
         distance: calculateDistance(lat, lng, v.location.lat, v.location.lng)
     })).sort((a, b) => a.distance - b.distance);
 }
-

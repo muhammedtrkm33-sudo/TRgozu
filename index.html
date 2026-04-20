@@ -1,24 +1,21 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0f172a">
-    <meta name="application-name" content="TR-GÖZÜ">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="TR-GÖZÜ">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href="manifest.json">
-    <title>TR-GÖZÜ | Acil Durum Yönetim Sistemi</title>
+    <title>TR-GOZU | Acil Durum Yönetim Sistemi</title>
     <link rel="icon" type="image/jpeg" href="assets/trgozu.jpg">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <!-- KULLANIM KOŞULLARI MODAL -->
+    <!-- KULLANIM KOŞULLARI MODALI -->
     <div id="contractModal" class="modal-overlay hidden">
         <div class="modal-content">
-            <h2 class="modal-title">TR-GÖZÜ</h2>
+            <h2 class="modal-title">TR-GOZU PROJESİ</h2>
             <div class="modal-body">
                 <h4 class="modal-subtitle">Misyonumuz</h4>
                 <p>Afet anlarında uydudan gelen termal verileri ve vatandaş konumlarını anlık olarak eşleştirerek, arama-kurtarma ekiplerine (AFAD/UMKE) en hızlı ve doğru hedefleme kabiliyetini kazandırmaktır.</p>
@@ -30,7 +27,7 @@
                     <li>256-bit uçtan uca şifreleme kullanılmaktadır.</li>
                 </ul>
                 <h4 class="modal-subtitle">Destek</h4>
-                <p>E-posta: <b>trgozu@gmail.com</b> adresinden bize ulaşabilirsiniz.</p>
+                <p>Instagram: <b>@tr.gozu33</b> üzerinden projeye destek olabilirsiniz.</p>
             </div>
             <label class="accept-checkbox">
                 <input type="checkbox" id="acceptCheck">
@@ -43,132 +40,51 @@
         </div>
     </div>
 
-    <!-- HAKKIMIZDA MODAL -->
-    <div id="aboutModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2 class="modal-title">TR-GÖZÜ | Hakkımızda</h2>
-            <div class="modal-body">
-                <p><strong>TR-GÖZÜ</strong>, afet anlarında hayat kurtarmayı amaçlayan yerli ve milli bir acil durum yönetim sistemidir.</p>
-                <p>6 Şubat depremleri sonrası geliştirilen bu sistem, uydu verilerini ve vatandaş konumlarını analiz ederek arama-kurtarma ekiplerine gerçek zamanlı bilgi sağlar. Amacımız, enkaz altındaki canlarımıza en hızlı şekilde ulaşılmasını sağlamaktır.</p>
-                <hr style="margin: 15px 0; border: 0; border-top: 1px solid rgba(255,255,255,0.1);">
-                <p><strong>Versiyon:</strong> 13.3 (Stable)</p>
-                <p><strong>İletişim:</strong> trgozu@gmail.com</p>
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-primary" onclick="closeAboutModal()">KAPAT</button>
-            </div>
-        </div>
-    </div>
-
     <!-- GİRİŞ EKRANI -->
     <div id="authSection">
         <div class="auth-shell">
-            <div class="auth-card">
-                <div class="auth-header">
-                    <h1 class="auth-title">TR GÖZÜ</h1>
-                    <p class="auth-subtitle">Milli Acil Durum Yönetim Sistemi</p>
-                </div>
-                <div class="auth-tabs">
-                    <button id="tab-c" class="tab-btn active" onclick="switchAuth('citizen')">Vatandaş</button>
-                    <button id="tab-a" class="tab-btn" onclick="switchAuth('admin')">Yetkili</button>
-                </div>
+        <img src="assets/trgozu.jpg" alt="TR-GOZU" class="auth-logo auth-logo--left" width="280" height="280" loading="eager" decoding="async">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1 class="auth-title">TR-GOZU</h1>
+                <p class="auth-subtitle">Milli Acil Durum Yönetim Sistemi</p>
+            </div>
+            <div class="auth-tabs">
+                <button id="tab-c" class="tab-btn active" onclick="switchAuth('citizen')">Vatandaş</button>
+                <button id="tab-a" class="tab-btn" onclick="switchAuth('admin')">Yetkili</button>
+            </div>
 
-                <!-- VATANDAŞ FORMU -->
-                <div id="citizenForm">
-                    <div class="form-group">
-                        <label>E-posta Adresiniz:</label>
-                        <input type="email" id="c_user" placeholder="örn: isim@gmail.com" inputmode="email" autocomplete="email">
-                    </div>
-                    <div class="form-group">
-                        <label>Şifreniz:</label>
-                        <div class="input-wrapper">
-                            <input type="password" id="c_pass" placeholder="Şifreniz" autocomplete="current-password">
-                            <span id="toggleTC" class="toggle-icon" onclick="togglePassVisibility()">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                            </span>
-                        </div>
-                    </div>
-                    <div class="form-buttons">
-                        <button class="btn btn-primary" onclick="validateLogin()">GİRİŞ</button>
-                        <button class="btn btn-outline" onclick="validateRegistration()">KAYIT OL</button>
-                    </div>
-                    <div style="text-align: center; margin-top: 15px;">
-                        <button type="button" class="btn btn-link" onclick="openForgotPasswordModal()" style="font-size: 16px; font-weight: 500; color: black; text-decoration: none; border: none; background: none; cursor: pointer; padding: 5px 10px;">ŞİFREMİ UNUTTUM</button>
+            <!-- VATANDAŞ FORMU -->
+            <div id="citizenForm">
+                <div class="form-group">
+                    <label>E-posta Adresiniz:</label>
+                    <input type="email" id="c_user" placeholder="orn: isim@gmail.com" inputmode="email" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label>Şifreniz:</label>
+                    <div class="input-wrapper">
+                        <input type="password" id="c_pass" placeholder="Şifreniz" autocomplete="current-password">
+                        <span id="toggleTC" class="toggle-icon" onclick="togglePassVisibility()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </span>
                     </div>
                 </div>
-
-                <!-- YETKİLİ FORMU -->
-                <div id="adminForm" class="hidden">
-                    <div class="form-group">
-                        <label>Yetkili Anahtar:</label>
-                        <input type="password" id="admin_key" placeholder="AFAD/UMKE/AKUT Anahtar">
-                    </div>
-                    <button class="btn btn-primary" onclick="handleAdminLoginLocal()">YETKİLİ GİRİŞİ</button>
+                <div class="form-buttons">
+                    <button class="btn btn-primary" onclick="valideGiris()">GİRİŞ</button>
+                    <button class="btn btn-outline" onclick="valideKayit()">KAYIT OL</button>
                 </div>
             </div>
-            <div class="auth-footer" style="grid-column: 1 / -1; text-align: center; margin-top: 10px;">
-                <button onclick="openAboutModal()" style="background: none; border: none; color: white; text-decoration: underline; cursor: pointer; font-size: 14px; opacity: 0.8;">Hakkımızda</button>
+
+            <!-- YETKİLİ FORMU -->
+            <div id="adminForm" class="hidden">
+                <div class="form-group">
+                    <label>Yetkili Anahtarı:</label>
+                    <input type="password" id="admin_key" placeholder="AFAD/UMKE/AKUT Anahtarı">
+                </div>
+                <button class="btn btn-primary" onclick="handleAdminGirisLocal()">YETKİLİ GİRİŞİ</button>
             </div>
         </div>
-    </div>
-
-    <!-- EMAL DOĞRULAMA MODAL -->
-    <div id="emailVerificationModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2 class="modal-title">Email Doğrulama</h2>
-            <div class="modal-body">
-                <p>Email adresinize gönderilen 6 haneli doğrulama kodunu girin:</p>
-                <div class="form-group" style="margin-top: 20px;">
-                    <input type="text" id="verificationCode" placeholder="000000" maxlength="6" style="text-align: center; font-size: 24px; letter-spacing: 8px; font-weight: bold;">
-                </div>
-                <p id="verificationEmail" style="font-size: 14px; color: var(--text-dim); margin-top: 10px;"></p>
-                <div id="verificationTimer" style="font-size: 18px; color: #e74c3c; font-weight: bold; margin-top: 10px;">02:00</div>
-                <p id="verificationMessage" style="font-size: 14px; color: var(--primary); margin-top: 10px; font-weight: bold;"></p>
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-secondary" onclick="closeEmailVerification()">İPTAL</button>
-                <button class="btn btn-primary" onclick="verifyEmailCode()">DOĞRULA</button>
-            </div>
-            <div style="text-align: center; margin-top: 15px;">
-                <button class="btn btn-link" onclick="resendVerificationCode()" id="resendBtn" style="font-size: 14px;">Kodu Tekrar Gönder</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ŞİFRE SIFIRLAMA MODAL -->
-    <div id="forgotPasswordModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2 class="modal-title">Şifre Sıfırlama</h2>
-            <div class="modal-body">
-                <p>Kayıtlı email adresinizi girin. Size şifre sıfırlama kodu gönderilecek.</p>
-                <div class="form-group" style="margin-top: 20px;">
-                    <input type="email" id="resetEmail" placeholder="isim@gmail.com" inputmode="email">
-                </div>
-                <p id="resetMessage" style="font-size: 13px; color: var(--text-dim); margin-top: 10px;"></p>
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-secondary" onclick="closeForgotPasswordModal()">İPTAL</button>
-                <button class="btn btn-primary" onclick="startForgotPassword()">KODU GÖNDER</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="resetPasswordModal" class="modal-overlay hidden">
-        <div class="modal-content">
-            <h2 class="modal-title">Yeni Şifre Oluştur</h2>
-            <div class="modal-body">
-                <div class="form-group" style="margin-top: 10px;">
-                    <input type="password" id="newPassword" placeholder="Yeni Şifre">
-                </div>
-                <div class="form-group" style="margin-top: 10px;">
-                    <input type="password" id="confirmNewPassword" placeholder="Yeni şifreyi tekrar girin">
-                </div>
-                <p id="resetPasswordMessage" style="font-size: 13px; color: var(--text-dim); margin-top: 10px;"></p>
-            </div>
-            <div class="modal-buttons">
-                <button class="btn btn-secondary" onclick="closeResetPasswordModal()">İPTAL</button>
-                <button class="btn btn-primary" onclick="submitNewPassword()">GÜNCELLE</button>
-            </div>
+        <img src="assets/trgozu.jpg" alt="TR-GOZU" class="auth-logo auth-logo--right" width="280" height="280" loading="eager" decoding="async">
         </div>
     </div>
 
@@ -194,12 +110,6 @@
                             <span id="batteryPercent">100%</span>
                         </div>
                     </div>
-
-                    <button class="btn btn-danger" onclick="logout()" style="width: 100%; margin-top: 20px; border-radius: 8px; font-weight: 600;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                        ANA MENÜYE DÖN (ÇIKIŞ)
-                    </button>
-
                     <hr class="divider">
 
                     <!-- VATANDAŞ PANELİ -->
@@ -243,13 +153,13 @@
                                     <b id="val-sel-forecast">-</b>
                                 </div>
                             </div>
-                            <p class="risk-legend"><span class="leg-low">Düşük</span>  <span class="leg-mid">Orta</span>  <span class="leg-hi">Yüksek</span>  <span class="leg-cr">Kritik</span></p>
+                            <p class="risk-legend"><span class="leg-low">Düşük</span> · <span class="leg-mid">Orta</span> · <span class="leg-hi">Yüksek</span> · <span class="leg-cr">Kritik</span></p>
                             <p id="val-seismic-heuristic" class="seismic-heuristic" style="font-size:10px;color:var(--text-muted);line-height:1.45;margin:0 0 8px 0"></p>
                             <div class="info-box">
                                 <b>Bölge:</b> <span id="val-belediye">-</span><br>
                                 <b>Hava:</b> <span id="val-hava">-</span><br>
                                 <b>Son 1 saat yağış:</b> <span id="val-yagis-mm">-</span><br>
-                                <b>Basınç:</b> <span id="val-basin-mbar">-</span><br>
+                                <b>Basınç:</b> <span id="val-basinç-mbar">-</span><br>
                                 <b>USGS (24 saat, TR):</b> <span id="val-usgs-24h" style="font-size:10px">-</span><br>
                                 <b>Son deprem:</b> <span id="val-deprem-son" style="font-size:10px">-</span><br>
                                 <b>Hava kalitesi:</b> <span id="val-air-quality">-</span>
@@ -289,16 +199,16 @@
                             <h5 class="section-subtitle">SAĞLIK DURUMU</h5>
                             <div class="health-grid">
                                 <button class="btn health-btn" data-status="iyiyim" onclick="sendHealthStatus('iyiyim')">
-                                    <span class="health-icon"></span> İyiyim
+                                    <span class="health-icon">🟢</span> İyiyim
                                 </button>
                                 <button class="btn health-btn" data-status="yaraliyim" onclick="sendHealthStatus('yaraliyim')">
-                                    <span class="health-icon"></span> Yaralıyım
+                                    <span class="health-icon">🟠</span> Yaralıyım
                                 </button>
                                 <button class="btn health-btn" data-status="kritik" onclick="sendHealthStatus('kritik')">
-                                    <span class="health-icon"></span> Kritik
+                                    <span class="health-icon">🔴</span> Kritik
                                 </button>
                                 <button class="btn health-btn" data-status="enkaz" onclick="sendHealthStatus('enkaz')">
-                                    <span class="health-icon"></span> Enkaz Altında
+                                    <span class="health-icon">🟣</span> Enkaz Altında
                                 </button>
                             </div>
                             <textarea id="healthNote" placeholder="Ek açıklama (opsiyonel)..."></textarea>
@@ -325,18 +235,18 @@
                             <div id="volunteerList" class="volunteer-list"></div>
                         </section>
 
-                        <!-- Acil Duyurular (Vatanda - Salt Okunur) -->
+                        <!-- Acil Duyurular (Vatandaş - Salt Okunur) -->
                         <section class="panel-section">
                             <h5 class="section-subtitle">ACİL DUYURULAR</h5>
                             <div id="citizenAnnouncementList" class="announcement-list"></div>
                         </section>
 
-                        <!-- Akll Yardm -->
+                        <!-- Akıllı Yardım -->
                         <section class="panel-section">
-                            <h5 class="section-subtitle">AKLL YARDM</h5>
+                            <h5 class="section-subtitle">AKILLI YARDIM</h5>
                             <button class="btn btn-outline btn-sm" onclick="openHelpRequestModal()">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                                Yardm İste
+                                Yardım İste
                             </button>
                             <div id="helpRequestsList" class="help-list"></div>
                         </section>
@@ -366,6 +276,16 @@
                         <section class="panel-section">
                             <h4 class="section-title">VATANDAŞ TAKİP</h4>
                             <div id="citizenTrackList" class="tracking-list"></div>
+                        </section>
+
+                        <!-- AI Ekip Yönlendirme -->
+                        <section class="panel-section">
+                            <h4 class="section-title text-warning">AI EKİP YÖNLENDİRME</h4>
+                            <button class="btn btn-ai" onclick="runAIRouting()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                AI ANALİZ BAŞLAT
+                            </button>
+                            <div id="routingResults" class="routing-list"></div>
                         </section>
 
                         <!-- Kurum ve Kuruluşlar -->
@@ -422,25 +342,25 @@
                     <button class="map-ctrl-btn" id="btnSatellite" onclick="toggleSatellite()" title="Uydu Görüntüsü">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
                     </button>
-                    <button class="map-ctrl-btn" id="btnFirms" onclick="toggleFirmsHotspots()" title="NASA VIIRS / FIRMS uydu sıcak noktaları"></button>
+                    <button class="map-ctrl-btn" id="btnFirms" onclick="toggleFirmsHotspots()" title="NASA VIIRS / FIRMS uydu sıcak noktaları">🔥</button>
                     <button class="map-ctrl-btn" id="btnHeatmap" onclick="toggleHeatmap()" title="Yoğunluk Haritası">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
                     </button>
-                    <button class="map-ctrl-btn" id="btnRoute" onclick="showSafeRoute()" title="Tüm güvenli rotalar - 5 km içindeki hastane ve toplanma alanlarına (OSRM)">
+                    <button class="map-ctrl-btn" id="btnRoute" onclick="showSafeRoute()" title="Tüm güvenli rotalar — 5 km içindeki hastane ve toplanma alanlarına (OSRM)">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
                     </button>
                 </div>
 
-                <!-- Harita Üst Panel -->
+                <!-- Harita Üstü Panel -->
                 <div id="mapOverlayPanel" class="map-overlay-panel hidden">
                     <div class="overlay-header">
                         <h4 id="overlayTitle">Bilgi</h4>
-                        <button onclick="closeMapOverlay()" class="close-btn"></button>
+                        <button onclick="closeMapOverlay()" class="close-btn">×</button>
                     </div>
                     <div id="overlayContent" class="overlay-content"></div>
                 </div>
                 <div class="map-data-attribution" id="mapDataAttr">
-                    Canlı: AFAD ArcGIS | Kandilli | OSM yollar (OSRM) | VIIRS NRT (NASA)
+                    Canlı: AFAD ArcGIS · Kandilli · OSM yolları (OSRM) · VIIRS NRT (NASA)
                 </div>
             </div>
         </div>
@@ -450,36 +370,31 @@
             <span class="sos-text">SOS</span>
         </button>
 
-        <!-- PANİK BUTONU -->
-        <button class="panic-btn" id="panicBtn" onclick="triggerPanic()">
-            <span class="panic-text">PANİK</span>
-        </button>
-
-        <!-- MESAJLAMA BUTONU -->
+        <!-- MESAJLAŞMA BUTONU -->
         <button class="msg-fab" onclick="toggleMessaging()">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span id="msgUnreadBadge" class="unread-badge hidden">0</span>
         </button>
 
-        <!-- A CHAT BUTONU -->
+        <!-- AI CHAT BUTONU -->
         <button class="chat-fab" onclick="toggleChat()">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         </button>
 
-        <!-- SESLİ UYAR BUTONU -->
+        <!-- SESLİ UYARI BUTONU -->
         <button class="voice-fab" onclick="toggleVoiceAlert()">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
         </button>
     </main>
 
-    <!-- SOS MODAL -->
+    <!-- SOS MODALI -->
     <div id="sosModal" class="sos-modal hidden">
         <div class="sos-modal-content">
             <div class="sos-icon">
                 <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
             <h2 class="sos-title">ACİL DURUM SİNYALİ</h2>
-            <p class="sos-subtitle">TR-GÖZÜ Acil Yardım Sistemi</p>
+            <p class="sos-subtitle">TR-GOZU Acil Yardım Sistemi</p>
             <div class="sos-countdown" id="sosCountdown">5</div>
             <p class="sos-status" id="sosStatus">SOS sinyali gönderilecek...<br>İptal etmek için VAZGEÇ butonuna basın.</p>
             <div class="sos-btn-row">
@@ -489,7 +404,7 @@
         </div>
     </div>
 
-    <!-- GÖNÜLLÜ MODAL -->
+    <!-- GÖNÜLLÜ MODALI -->
     <div id="volunteerModal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 class="modal-title">Gönüllü Kayıt Formu</h3>
@@ -527,9 +442,9 @@
         <div class="panel-header">
             <div class="panel-title">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                <span>TR-GÖZÜ AI Destek</span>
+                <span>TR-GOZU AI Destek</span>
             </div>
-            <button onclick="toggleChat()" class="close-btn"></button>
+            <button onclick="toggleChat()" class="close-btn">×</button>
         </div>
         <div id="chatMessages" class="chat-messages"></div>
         <div id="chatTyping" class="chat-typing hidden">AI yazıyor...</div>
@@ -541,14 +456,14 @@
         </div>
     </div>
 
-    <!-- MESAJLAMA PANELİ -->
+    <!-- MESAJLAŞMA PANELİ -->
     <div id="messagingPanel" class="messaging-panel hidden">
         <div class="panel-header">
             <div class="panel-title">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 <span>Mesajlar</span>
             </div>
-            <button onclick="toggleMessaging()" class="close-btn"></button>
+            <button onclick="toggleMessaging()" class="close-btn">×</button>
         </div>
         <!-- Sekmeler: DM | Bölge -->
         <div class="msg-tabs">
@@ -568,7 +483,7 @@
             </div>
             <div id="threadView" class="hidden">
                 <div class="thread-header">
-                    <button onclick="backToInbox()" class="back-btn"></button>
+                    <button onclick="backToInbox()" class="back-btn">←</button>
                     <span id="threadTitle"></span>
                 </div>
                 <div id="threadMessages" class="thread-messages"></div>
@@ -595,7 +510,7 @@
         </div>
     </div>
 
-    <!-- YENİ MESAJ MODAL -->
+    <!-- YENİ MESAJ MODALI -->
     <div id="newMessageModal" class="modal-overlay hidden">
         <div class="modal-content modal-sm">
             <h3 class="modal-title">Yeni Mesaj</h3>
@@ -614,7 +529,7 @@
         </div>
     </div>
 
-    <!-- AİLE ÜYESİ MODAL -->
+    <!-- AİLE ÜYESİ MODALI -->
     <div id="familyModal" class="modal-overlay hidden">
         <div class="modal-content modal-sm">
             <h3 class="modal-title">Aile Üyesi Ekle</h3>
@@ -631,10 +546,10 @@
                 <select id="familyRelation">
                     <option value="anne">Anne</option>
                     <option value="baba">Baba</option>
-                    <option value="karde">Kardeş</option>
-                    <option value="e">Eş</option>
-                    <option value="ocuk">Çocuk</option>
-                    <option value="dier">Diğer</option>
+                    <option value="kardeş">Kardeş</option>
+                    <option value="eş">Eş</option>
+                    <option value="çocuk">Çocuk</option>
+                    <option value="diğer">Diğer</option>
                 </select>
             </div>
             <div class="modal-buttons">
@@ -644,7 +559,7 @@
         </div>
     </div>
 
-    <!-- YARDIM İSTE MODAL -->
+    <!-- YARDIM İSTE MODALI -->
     <div id="helpRequestModal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 class="modal-title">Yardım İste</h3>
@@ -671,7 +586,7 @@
         </div>
     </div>
 
-    <!-- KURUM/KURULUŞ MODAL -->
+    <!-- KURUM/KURULUŞ MODALI -->
     <div id="institutionModal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 class="modal-title">Yakın Kurumlar</h3>
@@ -684,7 +599,7 @@
         </div>
     </div>
 
-    <!-- DUYURU MODAL -->
+    <!-- DUYURU MODALI -->
     <div id="announcementModal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 class="modal-title">Acil Duyuru Ekle</h3>
@@ -712,7 +627,7 @@
         </div>
     </div>
 
-    <!-- KAYIP KİŞİ MODAL -->
+    <!-- KAYIP KİŞİ MODALI -->
     <div id="missingPersonModal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 class="modal-title">Kayıp Kişi Bildir</h3>
@@ -721,7 +636,7 @@
                 <input type="text" id="missingName" placeholder="Ad Soyad">
             </div>
             <div class="form-group">
-                <label>Yaş:</label>
+                <label>Yaşı:</label>
                 <input type="number" id="missingAge" placeholder="Yaş" min="0" max="120">
             </div>
             <div class="form-group">
@@ -751,7 +666,7 @@
         </div>
     </div>
 
-    <!-- TOPLULUK DOĞRULAMA MODAL -->
+    <!-- TOPLULUK DOĞRULAMA MODALI -->
     <div id="verificationModal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 class="modal-title">Afet Bildirimi Doğrula</h3>
@@ -778,12 +693,12 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
                 <span>Sesli Uyarı</span>
             </div>
-            <button onclick="toggleVoiceAlert()" class="close-btn"></button>
+            <button onclick="toggleVoiceAlert()" class="close-btn">×</button>
         </div>
         <div class="voice-alert-content">
             <button class="btn btn-danger btn-lg" onclick="playAlertSound()">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                ACİL UYARI SAL
+                ACİL UYARI ÇAL
             </button>
             <div class="voice-settings">
                 <label>
@@ -805,7 +720,7 @@
         <span id="toastMessage"></span>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="js/config.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/api.js"></script>
@@ -832,26 +747,15 @@
     <script src="js/airquality.js"></script>
     <script>
         // Uygulama başlatma
-        console.log(' TR-GÖZÜ Başlatılıyor...');
-        
         document.addEventListener('DOMContentLoaded', function() {
-            const user = JSON.parse(localStorage.getItem('currentUser'));
-            
-            // Eğer kullanıcı giriş yapmışsa, auth.js handleLoggedInState üzerinden haritayı başlatacak.
-            // Eğer giriş yapmamışsa, haritayı şimdi başlatmıyoruz (boyut hatası olmaması için).
-            if (user) {
-                console.log(' Kullanıcı oturumu aktif, uygulama içi yükleme bekleniyor.');
-            } else {
-                console.log(' Giriş ekranı aktif.');
+            initMap();
+            if (typeof initAnnouncementTicker === 'function') {
+                initAnnouncementTicker();
             }
-
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(reg => console.log('Service worker kayıtlı:', reg.scope))
-                    .catch(err => console.warn('Service worker kaydı başarısız:', err));
+            if (typeof requestNotificationPermission === 'function') {
+                requestNotificationPermission();
             }
         });
     </script>
 </body>
 </html>
-

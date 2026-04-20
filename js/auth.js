@@ -1,406 +1,388 @@
-// TR-GÖZÜ - ANDROID FINAL AUTH (YARIŞMA MODU)
-let countdownTimer = null;
+// TR-GOZU Kimlik Doğrulama Modülü
 
-const getApiBase = () => {
-    // Render'a dağıtım yapıldığında bu URL kullanılmalı:
-    return 'https://trgozu.onrender.com';
-
-    // Yerel testler için alttakileri kullanabilirsiniz:
-    // return 'http://192.168.1.104:3000';
+const ADMIN_KEYS = {
+    "AFAD2026": "AFAD Komuta Merkezi",
+    "UMKE911": "UMKE Acil Müdahale",
+    "AKUT123": "AKUT Operasyon",
+    "ADMIN": "Sistem Yöneticisi"
 };
 
-// GLOBAL API BASE TANIMI (Hata almamak için window nesnesine bağlıyoruz)
-//window.AUTH_API_BASE = getApiBase();
+let tempUserData = null;
 
-// Eğer render.com kullanmak istersen alttaki satırı açabilirsin:
- window.AUTH_API_BASE = 'https://trgozu.onrender.com';
-
-
-async function apiPost(endpoint, data) {
-    const url = window.AUTH_API_BASE + endpoint;
-    console.log("📡 İstek gönderiliyor:", url);
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Bypass-Tunnel-Reminder': 'true'
-            },
-            body: JSON.stringify(data)
-        });
-
-        const text = await response.text();
-        let result;
-        try {
-            result = JSON.parse(text);
-        } catch (e) {
-            console.error("❌ JSON Parse Hatası:", text);
-            throw new Error("Sunucu geçersiz yanıt verdi (HTML dönmüş olabilir).");
-        }
-
-        if (!response.ok) throw new Error(result.message || `Hata: ${response.status}`);
-        return result;
-    } catch (err) {
-        console.error("🚨 Ağ Hatası:", err);
-        throw new Error("Sunucuya ulaşılamıyor! (URL: " + url + ")");
-    }
+// Giriş türünü değiştir
+function switchAuth(type) {
+    document.getElementById('citizenForm').classList.toggle('hidden', type !== 'citizen');
+    document.getElementById('adminForm').classList.toggle('hidden', type !== 'admin');
+    document.getElementById('tab-c').classList.toggle('active', type === 'citizen');
+    document.getElementById('tab-a').classList.toggle('active', type === 'admin');
 }
 
-function startCountdown() {
-    clearInterval(countdownTimer);
-    let timeLeft = 120;
-    const timerDisplay = document.getElementById('verificationTimer');
-    countdownTimer = setInterval(() => {
-        let mins = Math.floor(timeLeft / 60);
-        let secs = timeLeft % 60;
-        if (timerDisplay) timerDisplay.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        if (timeLeft <= 0) clearInterval(countdownTimer);
-        timeLeft--;
-    }, 1000);
-}
+// Şifre görünürlüğünü değiştir
+function togglePassVisibility() {
+    const passInput = document.getElementById('c_pass');
+    const toggleIcon = document.getElementById('toggleTC');
 
-// GİRİŞ YAP - Sunucu Doğrulamalı
-window.validateLogin = async function() {
-    const email = document.getElementById('c_user').value.trim().toLowerCase();
-    const pass = document.getElementById('c_pass').value;
-
-    if (!email || !pass) { alert("E-posta ve şifre gereklidir."); return; }
-
-    showLoading(true);
-    try {
-        const res = await apiPost('/api/save-user', { email, pass, mode: 'login' });
-        showLoading(false);
-        if (res.success) {
-            localStorage.setItem('currentUser', JSON.stringify({ email, role: 'citizen' }));
-            location.reload();
-        }
-    } catch (err) {
-        showLoading(false);
-        alert("Giriş Başarısız: " + (err.message.includes('401') ? "Hatalı email veya şifre!" : err.message));
-    }
-};
-
-// YETKİLİ GİRİŞİ (Lokal/Anahtar Bazlı)
-window.handleAdminLoginLocal = function() {
-    const key = document.getElementById('admin_key').value;
-    if (key === 'TRGOZU2024' || key === 'AFAD123') {
-        localStorage.setItem('currentUser', JSON.stringify({ email: 'yetkili@trgozu.gov.tr', role: 'admin' }));
-        location.reload();
+    if (passInput.type === "password") {
+        passInput.type = "text";
+        toggleIcon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
     } else {
-        alert("Geçersiz Yetkili Anahtarı!");
+        passInput.type = "password";
+        toggleIcon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
     }
-};
+}
 
-// ÇIKIŞ (ANA MENÜYE DÖN)
-window.logout = function() {
-    localStorage.removeItem('currentUser');
-    location.reload();
-};
+// Kullanım koşulları modalını göster
+function showContract() {
+    document.getElementById('contractModal').classList.remove('hidden');
+}
 
-// KAYIT OL
-window.validateRegistration = async function() {
-    const email = document.getElementById('c_user').value.trim().toLowerCase();
-    const pass = document.getElementById('c_pass').value;
+// Modalı kapat
+function closeModal() {
+    document.getElementById('contractModal').classList.add('hidden');
+    if (!STATE.userRole) tempUserData = null;
+}
 
-    if (!email.includes('@')) { alert("Geçerli bir e-posta girin."); return; }
-    if (pass.length < 6) { alert("Şifre en az 6 karakter olmalıdır."); return; }
+// Sözleşmeyi onayla ve devam et
+function confirmContract() {
+    if (!document.getElementById('acceptCheck').checked) {
+        showToast('Devam etmek için kullanım koşullarını kabul etmelisiniz!');
+        return;
+    }
 
-    showLoading(true);
-    try {
-        const res = await apiPost('/api/send-verification', { email, purpose: 'register' });
-        showLoading(false);
-        if (res.success) {
-            window.pendingRegistration = { email, pass };
-            document.getElementById('emailVerificationModal').classList.remove('hidden');
-            document.getElementById('verificationEmail').textContent = email;
-            startCountdown();
+    if (tempUserData) {
+        document.getElementById('contractModal').classList.add('hidden');
+        document.getElementById('authSection').classList.add('hidden');
+        initSystem();
+    } else {
+        showToast('Lütfen giriş yapın veya kayıt olun.');
+        closeModal();
+    }
+}
+
+// Sistemi başlat
+function initSystem() {
+    const mainApp = document.getElementById('mainApp');
+    const displayUser = document.getElementById('displayUser');
+    const roleBadge = document.getElementById('roleBadge');
+
+    mainApp.classList.remove('hidden');
+    displayUser.innerText = tempUserData.email || tempUserData.tc || 'Kullanıcı';
+
+    // Haritayı başlat - DOM hazır olana kadar bekle
+    setTimeout(() => {
+        if (typeof initMap === "function") {
+            initMap();
         }
-    } catch (err) {
-        showLoading(false);
-        alert("Kayıt Hatası: " + err.message);
-    }
-};
+    }, 100);
 
-window.resendVerificationCode = async function() {
-    const email = (window.pendingRegistration || window.pendingPasswordReset || {}).email;
-    if (!email) return;
+    const voiceFab = document.querySelector('.voice-fab');
+    if (voiceFab) voiceFab.classList.toggle('hidden', STATE.userRole !== 'admin');
 
-    showLoading(true);
-    try {
-        const res = await apiPost('/api/send-verification', { email, purpose: 'resend' });
-        showLoading(false);
-        if (res.success) {
-            alert("Yeni kod gönderildi.");
-            startCountdown();
-        }
-    } catch (err) {
-        showLoading(false);
-        alert("Hata: " + err.message);
-    }
-};
-
-window.verifyEmailCode = async function() {
-    const code = document.getElementById('verificationCode').value.trim();
-    const email = (window.pendingRegistration || window.pendingPasswordReset || {}).email;
-
-    showLoading(true);
-    try {
-        const res = await apiPost('/api/verify-code', { email, code });
-        if (res.success) {
-            clearInterval(countdownTimer);
-            document.getElementById('emailVerificationModal').classList.add('hidden');
-
-            if (window.pendingRegistration) {
-                // Email doğrulandı, şimdi kullanıcıyı sunucuya kalıcı olarak kaydet
-                const saveRes = await apiPost('/api/save-user', {
-                    email: window.pendingRegistration.email,
-                    pass: window.pendingRegistration.pass,
-                    mode: 'reg'
-                });
-                showLoading(false);
-                if (saveRes.success) {
-                    localStorage.setItem('currentUser', JSON.stringify({ email: window.pendingRegistration.email, role: 'citizen' }));
-                    alert("Kayıt Başarılı! Uygulama açılıyor...");
-                    location.reload();
-                }
-            } else if (window.pendingPasswordReset) {
-                showLoading(false);
-                window.openResetPasswordModal();
-            }
-        }
-    } catch (err) {
-        showLoading(false);
-        alert("Hata: " + err.message);
-    }
-};
-
-function handleLoggedInState(user) {
-    console.log("🔐 Giriş durumu işleniyor:", user.email);
-    document.getElementById('authSection').classList.add('hidden');
-    document.getElementById('mainApp').classList.remove('hidden');
-    document.getElementById('displayUser').textContent = user.email;
-
-    // Role özel paneli göster
-    const role = user.role || 'citizen';
-    if (role === 'admin') {
+    if (STATE.userRole === 'admin') {
+        // Yetkili paneli
         document.getElementById('adminPanel').classList.remove('hidden');
         document.getElementById('citizenPanel').classList.add('hidden');
-        const badge = document.getElementById('roleBadge');
-        if (badge) {
-            badge.textContent = 'YETKİLİ';
-            badge.className = 'badge';
-            badge.style.background = '#c20000';
-            badge.style.color = 'white';
-        }
+        roleBadge.innerText = tempUserData.unit || "YETKILI";
+        roleBadge.style.background = "var(--primary)";
+
+        // Yetkili görünümünü başlat
+        setTimeout(() => {
+            if (typeof startAdminView === "function") startAdminView();
+            if (typeof updateAdminView === "function") updateAdminView();
+            if (typeof loadAnnouncements === "function") loadAnnouncements();
+            if (typeof loadMissingPersons === "function") loadMissingPersons();
+            if (typeof loadVerifications === "function") loadVerifications();
+        }, 1000);
     } else {
+        // Vatandaş paneli
         document.getElementById('citizenPanel').classList.remove('hidden');
         document.getElementById('adminPanel').classList.add('hidden');
-        const badge = document.getElementById('roleBadge');
-        if (badge) {
-            badge.textContent = 'VATANDAŞ';
-            badge.className = 'badge';
-            badge.style.background = 'white';
-            badge.style.color = '#0f172a';
-        }
+        roleBadge.innerText = "VATANDAŞ";
+        roleBadge.style.background = "var(--secondary)";
+
+        // Bildirim izni iste
+        requestNotificationPermission();
+
+        // Gönüllü ve sohbet geçmişini yükle
+        setTimeout(() => {
+            if (typeof loadVolunteerList === 'function') loadVolunteerList();
+            if (typeof loadChatHistory === 'function') loadChatHistory();
+            if (typeof loadFamilyMembers === 'function') loadFamilyMembers();
+            if (typeof loadHelpRequests === 'function') loadHelpRequests();
+        }, 1000);
     }
 
-    // Kritik modülleri başlat
+    // Harita boyutını birkaç kez ayarla (DOM hazır olmayabilir)
     setTimeout(() => {
-        console.log("🚀 Modüller başlatılıyor...");
+        if (window.map) window.map.invalidateSize();
+    }, 300);
+    setTimeout(() => {
+        if (window.map) window.map.invalidateSize();
+    }, 800);
+    setTimeout(() => {
+        if (window.map) window.map.invalidateSize();
+    }, 1500);
 
-        // 1. Harita Başlatma
-        try {
-            if (typeof window.initMap === 'function') {
-                window.initMap();
-                console.log("✅ Harita başarıyla başlatıldı.");
-            }
-        } catch (e) {
-            console.error("❌ initMap hatası:", e);
-        }
-
-        // 2. Harita Boyutu Güncelleme (Android WebView Garantisi)
-        const forceMapRedraw = () => {
-            try {
-                if (window.map) {
-                    window.map.invalidateSize();
-                    // Harita container'ının stilini zorla tetikle (bazı Android sürümleri için)
-                    const m = document.getElementById('map');
-                    if (m) {
-                        const h = m.offsetHeight;
-                        m.style.height = (h - 1) + 'px';
-                        setTimeout(() => { m.style.height = '100%'; window.map.invalidateSize(); }, 50);
-                    }
-                    console.log('🔄 Harita boyutu zorla güncellendi');
-                }
-            } catch (e) {
-                console.warn('⚠️ forceMapRedraw hatası:', e);
-            }
-        };
-        setTimeout(forceMapRedraw, 300);
-        setTimeout(forceMapRedraw, 1500);
-
-        // 3. Admin Paneli Başlatma
-        if (role === 'admin') {
-            try {
-                if (typeof window.startAdminView === 'function') {
-                    window.startAdminView();
-                    console.log("✅ Admin görünümü başlatıldı.");
-                }
-            } catch (e) {
-                console.error("❌ startAdminView hatası:", e);
-            }
-        }
-
-        // 4. Diğer Başlatmalar (Eski initApp yerine buraya eklenebilir)
-        console.log("🏁 Uygulama başlatma tamamlandı.");
-
-    }, 500);
+    // Bildirim göster
+    showToast(`${STATE.userRole === 'admin' ? 'Yetkili' : 'Vatandaş'} olarak hoş geldiniz!`);
 }
 
-window.switchAuth = (m) => {
-    document.getElementById('citizenForm').classList.toggle('hidden', m !== 'citizen');
-    document.getElementById('adminForm').classList.toggle('hidden', m === 'citizen');
-    document.getElementById('tab-c').classList.toggle('active', m === 'citizen');
-    document.getElementById('tab-a').classList.toggle('active', m !== 'citizen');
-};
-window.openForgotPasswordModal = () => {
-    const modal = document.getElementById('forgotPasswordModal');
-    if (modal) {
-        document.getElementById('resetEmail').value = '';
-        const msgEl = document.getElementById('resetMessage');
-        if (msgEl) msgEl.textContent = '';
-        modal.classList.remove('hidden');
-    }
-};
+// Kayıt ol
+function valideKayit() {
+    const email = document.getElementById('c_user').value.trim().toLowerCase();
+    const pass = document.getElementById('c_pass').value;
 
-window.closeForgotPasswordModal = () => {
-    const modal = document.getElementById('forgotPasswordModal');
-    if (modal) modal.classList.add('hidden');
-};
-
-window.closeEmailVerification = () => {
-    const modal = document.getElementById('emailVerificationModal');
-    if (modal) modal.classList.add('hidden');
-};
-
-window.startForgotPassword = async function() {
-    const email = document.getElementById('resetEmail').value.trim().toLowerCase();
-    const msgEl = document.getElementById('resetMessage');
-
-    if (!email || !email.includes('@')) {
-        if (msgEl) msgEl.textContent = "Geçerli bir e-posta girin.";
+    // Email doğrulama
+    if (!email) {
+        showToast('E-posta adresi gerekli!');
         return;
     }
 
-    showLoading(true);
-    try {
-        const res = await apiPost('/api/send-verification', { email, purpose: 'reset' });
-        showLoading(false);
-        if (res.success) {
-            window.pendingPasswordReset = { email };
-            window.pendingRegistration = null; // Kayıtla çakışmasın
-            window.closeForgotPasswordModal();
-            document.getElementById('emailVerificationModal').classList.remove('hidden');
-            document.getElementById('verificationEmail').textContent = email;
-            startCountdown();
+    if (!isValidEmail(email)) {
+        showToast('Geçerli bir e-posta adresi girin!');
+        return;
+    }
+
+    if (!email.endsWith("@gmail.com")) {
+        showToast('Sadece @gmail.com uzantılı adresler kabul edilir!');
+        return;
+    }
+
+    // Şifre doğrulama
+    if (pass.length < 4) {
+        showToast('Şifre en az 4 karakter olmalıdır!');
+        return;
+    }
+
+    // Kayıt kontrolü
+    const existingPass = localStorage.getItem("user_" + email);
+    if (existingPass) {
+        showToast('Bu e-posta zaten kayıtlı! Giriş yapın.');
+        return;
+    }
+
+    // Kayıt işlemi
+    localStorage.setItem("user_" + email, pass);
+
+    // Vatandaş verisini oluştur
+    updateCitizen(email, {
+        lastActive: new Date().toISOString(),
+        registeredAt: new Date().toISOString()
+    });
+
+    // Giriş yap
+    STATE.userRole = 'citizen';
+    tempUserData = { email };
+    setCurrentUserEmail(email);
+
+    showContract();
+}
+
+// Giriş yap
+function valideGiris() {
+    const email = document.getElementById('c_user').value.trim().toLowerCase();
+    const pass = document.getElementById('c_pass').value;
+
+    if (!pass || !String(pass).trim()) {
+        const pe = document.getElementById('c_pass');
+        if (pe) pe.focus();
+        showToast('Şifrenizi girin.');
+        return;
+    }
+
+    // Email doğrulama
+    if (!email || !isValidEmail(email)) {
+        showToast('Geçerli bir e-posta girin!');
+        return;
+    }
+
+    if (!email.endsWith("@gmail.com")) {
+        showToast('Sadece @gmail.com adresi girin!');
+        return;
+    }
+
+    // Şifre kontrolü
+    const kayitliSifre = localStorage.getItem("user_" + email);
+    if (!kayitliSifre) {
+        showToast('Kayıtlı kullanıcı bulunamadı! Önce kayıt olun.');
+        return;
+    }
+
+    if (kayitliSifre !== pass) {
+        showToast('Şifre hatalı!');
+        return;
+    }
+
+    // Giriş işlemi
+    STATE.userRole = 'citizen';
+    tempUserData = { email };
+    setCurrentUserEmail(email);
+
+    // Son aktifliği güncelle
+    updateCitizen(email, { lastActive: new Date().toISOString() });
+
+    showContract();
+}
+
+// Enter ile giriş / şifre alanına yönlendirme
+function initAuthEnterSubmit() {
+    document.addEventListener('keydown', onAuthSectionEnter);
+}
+
+function onAuthSectionEnter(e) {
+    if (e.key !== 'Enter' || e.repeat) return;
+
+    const contractEl = document.getElementById('contractModal');
+    if (contractEl && !contractEl.classList.contains('hidden')) {
+        e.preventDefault();
+        confirmContract();
+        return;
+    }
+
+    const authEl = document.getElementById('authSection');
+    if (!authEl || authEl.classList.contains('hidden')) return;
+
+    const t = e.target;
+    if (!t || t.tagName !== 'INPUT') return;
+
+    if (t.id === 'c_user') {
+        e.preventDefault();
+        const passEl = document.getElementById('c_pass');
+        const passVal = passEl ? String(passEl.value).trim() : '';
+        if (!passVal) {
+            showToast('Şifrenizi girin.');
+            if (passEl) passEl.focus();
+            return;
         }
-    } catch (err) {
-        showLoading(false);
-        if (msgEl) msgEl.textContent = "Hata: " + err.message;
-    }
-};
-
-window.openResetPasswordModal = () => {
-    const modal = document.getElementById('resetPasswordModal');
-    if (modal) {
-        document.getElementById('newPassword').value = '';
-        document.getElementById('confirmNewPassword').value = '';
-        const msgEl = document.getElementById('resetPasswordMessage');
-        if (msgEl) msgEl.textContent = '';
-        modal.classList.remove('hidden');
-    }
-};
-
-window.closeResetPasswordModal = () => {
-    const modal = document.getElementById('resetPasswordModal');
-    if (modal) modal.classList.add('hidden');
-};
-
-window.submitNewPassword = async function() {
-    const password = document.getElementById('newPassword').value.trim();
-    const confirmPassword = document.getElementById('confirmNewPassword').value.trim();
-    const msgEl = document.getElementById('resetPasswordMessage');
-
-    if (!window.pendingPasswordReset || !window.pendingPasswordReset.email) {
-        if (msgEl) msgEl.textContent = 'Hata: E-posta bilgisi kayboldu.';
+        valideGiris();
         return;
     }
 
-    if (password.length < 6) {
-        if (msgEl) msgEl.textContent = 'Şifre en az 6 karakter olmalıdır.';
-        return;
-    }
-
-    if (password !== confirmPassword) {
-        if (msgEl) msgEl.textContent = 'Şifreler eşleşmiyor.';
-        return;
-    }
-
-    showLoading(true);
-    try {
-        const res = await apiPost('/api/save-user', {
-            email: window.pendingPasswordReset.email,
-            pass: password,
-            mode: 'reg' // 'reg' modu existing user'ı günceller veya yeni oluşturur (server.js mantığına göre)
-        });
-        showLoading(false);
-        if (res.success) {
-            alert("Şifreniz başarıyla güncellendi. Giriş yapabilirsiniz.");
-            window.pendingPasswordReset = null;
-            window.closeResetPasswordModal();
-            location.reload();
+    if (t.id === 'c_pass') {
+        e.preventDefault();
+        if (!String(t.value).trim()) {
+            showToast('Şifrenizi girin.');
+            t.focus();
+            return;
         }
-    } catch (err) {
-        showLoading(false);
-        if (msgEl) msgEl.textContent = "Hata: " + err.message;
-    }
-};
-
-window.togglePassVisibility = () => {
-    const p = document.getElementById('c_pass');
-    p.type = p.type === 'password' ? 'text' : 'password';
-};
-
-// MODAL YÖNETİMİ
-window.openAboutModal = () => {
-    document.getElementById('aboutModal').classList.remove('hidden');
-};
-
-window.closeAboutModal = () => {
-    document.getElementById('aboutModal').classList.add('hidden');
-};
-
-window.closeModal = () => {
-    document.getElementById('contractModal').classList.add('hidden');
-};
-
-window.confirmContract = () => {
-    const check = document.getElementById('acceptCheck');
-    if (!check || !check.checked) {
-        alert("Devam etmek için kullanım koşullarını kabul etmelisiniz.");
+        valideGiris();
         return;
     }
-    localStorage.setItem('contractAccepted', 'true');
-    window.closeModal();
-};
 
-document.addEventListener('DOMContentLoaded', () => {
-    const user = JSON.parse(localStorage.getItem('currentUser'));
-    const contractAccepted = localStorage.getItem('contractAccepted');
-
-    if (user) {
-        handleLoggedInState(user);
-    } else if (contractAccepted !== 'true') {
-        document.getElementById('contractModal').classList.remove('hidden');
+    if (t.id === 'admin_key') {
+        e.preventDefault();
+        if (!String(t.value).trim()) {
+            showToast('Yetkili anahtarını girin.');
+            t.focus();
+            return;
+        }
+        handleAdminGirisLocal();
     }
-});
+}
+
+document.addEventListener('DOMContentLoaded', initAuthEnterSubmit);
+
+// Yetkili girişi (yerel)
+function handleAdminGirisLocal() {
+    const key = document.getElementById('admin_key').value.trim();
+    const unit = ADMIN_KEYS[key];
+
+    if (unit) {
+        STATE.userRole = 'admin';
+        tempUserData = {
+            email: 'YETKILI@ADMIN',
+            unit: unit,
+            tc: unit
+        };
+        showContract();
+    } else {
+        showToast('Hatalı Yetkili Anahtarı!');
+    }
+}
+
+// Yetkili görünümünü güncelle
+function updateAdminView() {
+    const listContainer = document.getElementById('adminGmailList');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = "";
+    const citizens = getCitizens();
+
+    if (citizens.length === 0) {
+        listContainer.innerHTML = "<p style='font-size: 11px; color: var(--text-dim);'>Henüz kayıtlı vatandaş yok.</p>";
+        return;
+    }
+
+    citizens.forEach(c => {
+        const healthBadge = c.healthStatus ? CONFIG.HEALTH_STATUS[c.healthStatus]?.icon || '' : '';
+        const statusColor = c.isSOS ? 'var(--primary)' : c.isPanic ? 'var(--primary)' : 'var(--secondary)';
+
+        listContainer.innerHTML += `
+            <div class="admin-card" onclick="flyToLocation(${c.lat || 0}, ${c.lng || 0})">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 12px; word-break: break-all; color: ${statusColor};">
+                        ${c.isSOS ? '🆘 ' : ''}${c.isPanic ? '🚨 ' : ''}${c.email}
+                    </span>
+                    ${healthBadge}
+                </div>
+                ${c.lastActive ? `<div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;">Son: ${timeSince(c.lastActive)}</div>` : ''}
+            </div>
+        `;
+    });
+}
+
+// Sidebar'ı aç/kapat (mobilde alt çekmece)
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('show');
+
+    // Harita boyutını güncelle - birden fazla kez çünkü animasyon var
+    setTimeout(() => {
+        if (window.map) window.map.invalidateSize();
+    }, 150);
+    setTimeout(() => {
+        if (window.map) window.map.invalidateSize();
+    }, 350);
+    setTimeout(() => {
+        if (window.map) window.map.invalidateSize();
+    }, 600);
+}
+
+// Çıkış yap
+function logout() {
+    if (confirm('Çıkış yapmak istediğinize emin misiniz?')) {
+        // Temizlik
+        STATE.userRole = null;
+        tempUserData = null;
+        STATE.userEmail = null;
+        STATE.currentLocation = null;
+        STATE.isLocationActive = false;
+
+        // UI'ı sıfırla
+        document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('authSection').classList.remove('hidden');
+        document.getElementById('citizenPanel').classList.add('hidden');
+        document.getElementById('adminPanel').classList.add('hidden');
+
+        // Formları temizle
+        document.getElementById('c_user').value = '';
+        document.getElementById('c_pass').value = '';
+        document.getElementById('admin_key').value = '';
+
+        // Timer'ları temizle
+        if (window.adminRefreshTimer) {
+            clearInterval(window.adminRefreshTimer);
+        }
+        if (window.trackingTimer) {
+            clearInterval(window.trackingTimer);
+        }
+
+        const voiceFab = document.querySelector('.voice-fab');
+        if (voiceFab) voiceFab.classList.add('hidden');
+
+        showToast('Güvenli çıkış yapıldı.');
+    }
+}

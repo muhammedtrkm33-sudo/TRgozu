@@ -8,19 +8,18 @@ function toggleChat() {
     const panel = document.getElementById('chatPanel');
 
     if (chatOpen) {
-        if (panel) panel.classList.remove('hidden');
-        const input = document.getElementById('chatInput');
-        if (input) input.focus();
+        panel.classList.remove('hidden');
+        document.getElementById('chatInput').focus();
 
         if (!getChatHistory().length) {
-            const welcome = getARandomResponse('greetings');
+            const welcome = getAIRandomResponse('greetings');
             addChatMessage(welcome, 'bot');
             addChatMessage('Deprem, sel, yangın, ilk yardım, toplanma alanı, SOS kullanımı gibi konularda soru sorabilirsiniz.', 'bot');
         } else {
             loadChatHistory();
         }
     } else {
-        if (panel) panel.classList.add('hidden');
+        panel.classList.add('hidden');
     }
 }
 
@@ -75,7 +74,6 @@ function appendChatMessage(container, text, type) {
 // Mesaj gönder
 async function sendChatMessage() {
     const input = document.getElementById('chatInput');
-    if (!input) return;
     const text = input.value.trim();
     if (!text) return;
 
@@ -99,7 +97,7 @@ async function sendChatMessage() {
                     role: m.type === 'user' ? 'user' : 'assistant',
                     content: m.text
                 }));
-            const res = await fetchWithRetry(proxyUrl, {
+            const res = await fetch(proxyUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text, messages: history })
@@ -114,7 +112,7 @@ async function sendChatMessage() {
                 return;
             }
         } catch (e) {
-            console.warn('AI proxy hatası:', e);
+            console.warn('AI proxy:', e);
         }
     }
 
@@ -145,24 +143,24 @@ function isDisallowedTopic(userMessage) {
     const m = userMessage.toLowerCase();
     const blocked = [
         'porno', 'porn', 'sex', 'seks', 'cinsel', 'masturb', 'escort', '+18',
-        'yetiskin icerik', 'nude', 'plak', 'amcik', 'sik', 'penis', 'vajina'
+        'yetiskin icerik', 'nude', 'çıplak', 'amcık', 'sikiş', 'penis', 'vajina'
     ];
     return blocked.some(k => m.includes(k));
 }
 
-// AI Yanıt Üretici (gelişmiş, bağlam destekli; yalnızca afet/acil; +18 yok)
+// AI Yanıt üreteci (gelişmiş, bağlam destekli — yalnızca afet/acil; +18 yok)
 function generateAIResponse(userMessage) {
     if (isDisallowedTopic(userMessage)) {
         return 'Bu konularda yardımcı olamam. TR-GOZU yalnızca afet, acil durum ve güvenlik bilgisi sunar. Deprem, yangın, rota veya SOS hakkında sorabilirsiniz.';
     }
 
     const msg = userMessage.toLowerCase()
-        .replace(/[ç]/g, 'c').replace(/[ş]/g, 's').replace(/[ğ]/g, 'g')
-        .replace(/[ü]/g, 'u').replace(/[ö]/g, 'o').replace(/[ıİ]/g, 'i');
+        .replace(/[çÇ]/g, 'c').replace(/[şŞ]/g, 's').replace(/[ğĞ]/g, 'g')
+        .replace(/[üÜ]/g, 'u').replace(/[öÖ]/g, 'o').replace(/[ıİ]/g, 'i');
 
-    // Selamlama
+    // Selamlaşma
     if (scoreKeywords(msg, ['merhaba', 'selam', 'hello', 'hi', 'hosgeldin', 'iyi gunler']) >= 1) {
-        return getARandomResponse('greetings');
+        return getAIRandomResponse('greetings');
     }
 
     // Teşekkür
@@ -172,20 +170,20 @@ function generateAIResponse(userMessage) {
 
     // AFAD / canlı veri / uydu harita
     if (scoreKeywords(msg, ['afad', 'afad harita', 'deprem afad', 'afad veri']) >= 1) {
-        return 'Deprem olayları AFAD\'ın ArcGIS yayını ile ve Kandilli verisiyle birleştirilerek güncellenir; haritada kırmızı daireler büyüklüğe göre son sarsıntıları gösterir. Uydu için haritada uydu düğmesine, dünya haritası için OSM düğmesine basabilirsiniz. Resmî bilgi: deprem.afad.gov.tr';
+        return 'Deprem olayları AFAD’un ArcGIS yayını ile ve Kandilli verisiyle birleştirilerek güncellenir; haritada kırmızı daireler büyüklüğe göre son sarsıntıları gösterir. Uydu için haritada uydu düğmesine, dünya haritası için OSM düğmesine basabilirsiniz. Resmî bilgi: deprem.afad.gov.tr';
     }
     if (scoreKeywords(msg, ['firms', 'nasa', 'uydu yangin', 'sicak nokta', 'thermal', 'viirs']) >= 1) {
-        return 'Haritada 🔥 (NASA VIIRS / FIRMS uyumlu NRT) düğmesine basın; görünen alandaki uydu sıcak noktaları yüklenir. Her nokta otomatik olarak gerçek yangın demek değildir; fabrika ve sıcak zemin de olabilir. Kesin teyit için yerel AFAD/orman veya 112 hattını kullanın.';
+        return 'Haritada 🔥 (NASA VIIRS / FIRMS uyumlu NRT) düğmesine basın; görünen alandaki uydu sıcak noktaları yüklenir. Her nokta otomatik olarak gerçek yangın demek değildir — fabrika ve sıcak zemin de olabilir. Kesin teyit için yerel AFAD/orman veya 110 hattını kullanın.';
     }
 
     // Deprem
-    const depremScore = scoreKeywords(msg, ['deprem', 'sarsinti', 'earthquake', 'quake', 'artci', 'enkaz', 'yikil', 'bina yikil', 'kandilli', 'sarsinti']);
+    const depremScore = scoreKeywords(msg, ['deprem', 'sarsinit', 'earthquake', 'quake', 'artci', 'enkaz', 'yikil', 'bina yikil', 'kandilli', 'sarsinti']);
     if (depremScore >= 1) {
         let resp = CONFIG.AI_RESPONSES.disasters.deprem;
         // Bağlam: Kandilli veri varsa ekle
         if (STATE.nearbyEarthquakes && STATE.nearbyEarthquakes.length > 0) {
             const nearest = STATE.nearbyEarthquakes[0];
-            resp += `\n\nBölgenizdeki son deprem: M${nearest.magnitude.toFixed(1)}  ${nearest.place || 'Bilinmiyor'} (${Math.round(nearest.distance)} km).`;
+            resp += `\n\nBölgenizdeki son deprem: M${nearest.magnitude.toFixed(1)} — ${nearest.place || 'Bilinmiyor'} (${Math.round(nearest.distance)} km).`;
         }
         return resp;
     }
@@ -194,7 +192,7 @@ function generateAIResponse(userMessage) {
     if (scoreKeywords(msg, ['sel', 'taskin', 'su baskini', 'flood', 'yagmur', 'nehir', 'dere']) >= 1) {
         let resp = CONFIG.AI_RESPONSES.disasters.sel;
         if (STATE.forecastData?.flood) {
-            resp += `\n\nSel tahmini: ${STATE.forecastData.flood.label}  ${STATE.forecastData.flood.detail}`;
+            resp += `\n\nSel tahmini: ${STATE.forecastData.flood.label} — ${STATE.forecastData.flood.detail}`;
         }
         return resp;
     }
@@ -203,7 +201,7 @@ function generateAIResponse(userMessage) {
     if (scoreKeywords(msg, ['yangin', 'ates', 'duman', 'alev', 'fire', 'tup', 'gaz']) >= 1) {
         let resp = CONFIG.AI_RESPONSES.disasters.yangin;
         if (STATE.forecastData?.fire) {
-            resp += `\n\nYangın risk indeksi: ${STATE.forecastData.fire.label}  ${STATE.forecastData.fire.detail}`;
+            resp += `\n\nYangın risk indeksi: ${STATE.forecastData.fire.label} — ${STATE.forecastData.fire.detail}`;
         }
         return resp;
     }
@@ -224,7 +222,7 @@ function generateAIResponse(userMessage) {
     }
 
     // İlk yardım
-    if (scoreKeywords(msg, ['ilk yardim', 'cpr', 'kalp masaji', 'kanama', 'kirik', 'yanik', 'bilinc kaybi', 'bayildi', 'sok', 'first aid']) >= 1) {
+    if (scoreKeywords(msg, ['ilk yardim', 'cpr', 'kalp masaji', 'kanama', 'kirik', 'yanik', 'bilinc kaybı', 'bayildi', 'sok', 'first aid']) >= 1) {
         return CONFIG.AI_RESPONSES.first_aid;
     }
 
@@ -247,9 +245,9 @@ function generateAIResponse(userMessage) {
     if (scoreKeywords(msg, ['toplanma', 'toplanma alani', 'assembly', 'guvenli yer', 'nereye gideyim', 'nereye gidecegim']) >= 1) {
         let resp = CONFIG.AI_RESPONSES.assembly;
         if (STATE.currentLocation) {
-            const toplanmaAd = document.getElementById('val-toplanma-ad');
-            if (toplanmaAd && toplanmaAd.textContent && toplanmaAd.textContent !== '-') {
-                resp += `\n\nEn yakın toplanma alanı: ${toplanmaAd.textContent}`;
+            const toplanma = document.getElementById('val-toplanma-ad');
+            if (toplanma && toplanma.textContent && toplanma.textContent !== '-') {
+                resp += `\n\nEn yakın toplanma alanı: ${toplanma.textContent}`;
                 const mesafe = document.getElementById('val-toplanma-mesafe');
                 if (mesafe && mesafe.textContent !== '-') resp += ` (${mesafe.textContent})`;
             }
@@ -261,9 +259,9 @@ function generateAIResponse(userMessage) {
     if (scoreKeywords(msg, ['hastane', 'saglik', 'doktor', 'klinik', 'acil servis', 'hospital', 'tibbi', 'yarali']) >= 1) {
         let resp = CONFIG.AI_RESPONSES.hospital;
         if (STATE.currentLocation) {
-            const hastane = document.getElementById('val-hastane');
-            if (hastane && hastane.textContent && hastane.textContent !== '-') {
-                resp += `\n\nEn yakın hastane: ${hastane.textContent}`;
+            const hast = document.getElementById('val-hastane');
+            if (hast && hast.textContent && hast.textContent !== '-') {
+                resp += `\n\nEn yakın hastane: ${hast.textContent}`;
                 const hMesafe = document.getElementById('val-hastane-mesafe');
                 if (hMesafe && hMesafe.textContent !== '-') resp += ` (${hMesafe.textContent})`;
             }
@@ -301,9 +299,9 @@ function generateAIResponse(userMessage) {
         if (STATE.lastWeatherData) {
             const w = STATE.lastWeatherData;
             const temp = Math.round(w.main.temp);
-            const heatIndex = typeof calculateHeatIndex === 'function'
+            const heatIdx = typeof calculateHeatIndex === 'function'
                 ? calculateHeatIndex(temp, w.main.humidity) : temp;
-            return `Bulunduğunuz bölgedeki anlık hava durumu:\n${w.weather[0].description}, ${temp}C (hissedilen: ${heatIndex}C), nem: %${w.main.humidity}, rüzgar: ${(w.wind.speed * 3.6).toFixed(0)} km/s.`;
+            return `Bulunduğunuz bölgedeki anlık hava durumu:\n${w.weather[0].description}, ${temp}°C (hissedilen: ${heatIdx}°C), nem: %${w.main.humidity}, rüzgar: ${(w.wind.speed * 3.6).toFixed(0)} km/s.`;
         }
         return CONFIG.AI_RESPONSES.weather || 'Sol panelde anlık hava durumu bilgisini görebilirsiniz.';
     }
@@ -329,12 +327,12 @@ function generateAIResponse(userMessage) {
 
     // Acil numaralar
     if (scoreKeywords(msg, ['numara', 'telefon', 'ara', 'call', '112', 'afad', 'itfaiye', 'polis']) >= 1) {
-        return 'Türkiye Acil Numaraları:\n\n112  İmdat / Ambulans / AFAD\n110  İtfaiye\n155  Polis\n156  Jandarma\n122  AFAD Doğal Afet\n182  Zehir Danışma\n\nSisteme bağlı olduğunuzda SOS butonu da yetkililer ile anında iletişim sağlar.';
+        return 'Türkiye Acil Numaraları:\n\n112 — İmdat / Ambulans / AFAD\n110 — İtfaiye\n155 — Polis\n156 — Jandarma\n122 — AFAD Doğal Afet\n182 — Zehir Danışma\n\nSisteme bağlı olduğunuzda SOS butonu da yetkililer ile anında iletişim sağlar.';
     }
 
-    // Kısa / doğal sorular ("ne", "nasıl", "neden" tek başına)
+    // Kısa / doğal sorular ("ne", "nasil", "neden" tek başına)
     if (msg.length < 4 || scoreKeywords(msg, ['ne yapayim', 'ne yapmali', 'yardim et bana', 'acil ne']) >= 1) {
-        return 'Afet anında özet: 1) Sakin kalın. 2) 112 / 110 / 155 arayın. 3) Mümkünse konumu açın. 4) SOS veya sağlık durumunu güncelleyin. 5) Tahliye varsa toplanma alanına gidin. Spesifik soru yazarsanız (ör. depremde çök-kapan-tutun) size göre yanıtlarım.';
+        return 'Afet anında özet: 1) Sakin kalın. 2) 112 / 110 / 155 arayın. 3) Mümkünse konumu açın. 4) SOS veya sağlık durumunu güncelleyin. 5) Tahliye varsa toplanma alanına gidin. Spesifik soru yazarsanız (ör. “depremde çök-kapan-tutun”) size göre yanıtlarım.';
     }
 
     // Varsayılan
@@ -342,7 +340,7 @@ function generateAIResponse(userMessage) {
 }
 
 // AI'dan rastgele yanıt al
-function getARandomResponse(type) {
+function getAIRandomResponse(type) {
     const responses = CONFIG.AI_RESPONSES[type];
     if (Array.isArray(responses)) {
         return responses[Math.floor(Math.random() * responses.length)];

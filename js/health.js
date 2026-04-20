@@ -1,13 +1,13 @@
-// TR-GÖZÜ Sağlık Durumu Modülü
+// TR-GOZU Sağlık Durumu Modülü
 
 let lastHealthUpdate = 0;
 
 // Sağlık durumunu gönder
-window.sendHealthStatus = function(status) {
+function sendHealthStatus(status) {
     const now = Date.now();
 
     // 30 saniyede bir güncelleme sınırı
-    if (now - lastHealthUpdate < 30000 && status === (window.STATE?.healthStatus)) {
+    if (now - lastHealthUpdate < 30000 && status === STATE.healthStatus) {
         showToast('Sağlık durumunuz zaten güncel.');
         return;
     }
@@ -25,23 +25,19 @@ window.sendHealthStatus = function(status) {
     const note = document.getElementById('healthNote')?.value || '';
 
     // Vatandaş verisini güncelle
-    if (typeof updateCitizen === 'function') {
-        updateCitizen(email, {
-            healthStatus: status,
-            healthNote: note,
-            healthUpdatedAt: new Date().toISOString()
-        });
-    }
+    updateCitizen(email, {
+        healthStatus: status,
+        healthNote: note,
+        healthUpdatedAt: new Date().toISOString()
+    });
 
-    if (window.STATE) {
-        window.STATE.healthStatus = status;
-    }
+    STATE.healthStatus = status;
     lastHealthUpdate = now;
 
     // Durum etiketini güncelle
     const labelEl = document.getElementById('healthStatusLabel');
     if (labelEl) {
-        const statusInfo = CONFIG.HEALTH_STATUS?.[status];
+        const statusInfo = CONFIG.HEALTH_STATUS[status];
         labelEl.innerHTML = `${statusInfo?.icon || ''} ${statusInfo?.label || status} durumu gönderildi!`;
         labelEl.style.color = statusInfo?.color || 'var(--secondary)';
     }
@@ -50,13 +46,13 @@ window.sendHealthStatus = function(status) {
     if (status === 'kritik' || status === 'enkaz') {
         playSound('alert');
         sendNotification(
-            '🚨 Sağlık Durumu Güncellemesi',
-            `${email} ${CONFIG.HEALTH_STATUS?.[status]?.label || status} durumunu bildirdi!`,
+            '⚠️ Sağlık Durumu Güncellemesi',
+            `${email} ${CONFIG.HEALTH_STATUS[status]?.label} durumunu bildirdi!`,
             { requireInteraction: true }
         );
     }
 
-    showToast(`Sağlık durumu: ${CONFIG.HEALTH_STATUS?.[status]?.label || status}`);
+    showToast(`Sağlık durumu: ${CONFIG.HEALTH_STATUS[status]?.label || status}`);
 
     // Haritayı güncelle (yetkili görünümünde)
     if (typeof loadCitizensOnMap === 'function') {
@@ -71,7 +67,7 @@ function updateHealthButtons(activeStatus) {
         const btnStatus = btn.dataset.status;
         if (btnStatus === activeStatus) {
             btn.classList.add('health-active');
-            btn.style.borderColor = CONFIG.HEALTH_STATUS?.[btnStatus]?.color || 'white';
+            btn.style.borderColor = CONFIG.HEALTH_STATUS[btnStatus]?.color || 'white';
         } else {
             btn.classList.remove('health-active');
             btn.style.borderColor = 'transparent';
@@ -81,14 +77,14 @@ function updateHealthButtons(activeStatus) {
 
 // Sağlık durumunu al
 function getHealthStatus(email) {
-    const citizens = typeof getCitizens === 'function' ? getCitizens() : [];
+    const citizens = getCitizens();
     const citizen = citizens.find(c => c.email === email);
     return citizen?.healthStatus || null;
 }
 
 // Sağlık geçmişini al
 function getHealthHistory(email) {
-    const citizens = typeof getCitizens === 'function' ? getCitizens() : [];
+    const citizens = getCitizens();
     const citizen = citizens.find(c => c.email === email);
 
     if (!citizen) return [];
@@ -107,7 +103,7 @@ function getHealthHistory(email) {
 
 // Kritik sağlık durumundakileri bul
 function getCriticalHealthCases() {
-    const citizens = typeof getCitizens === 'function' ? getCitizens() : [];
+    const citizens = getCitizens();
     return citizens.filter(c =>
         c.healthStatus === 'kritik' ||
         c.healthStatus === 'enkaz'
@@ -116,7 +112,7 @@ function getCriticalHealthCases() {
 
 // Sağlık durumuna göre renk
 function getHealthColor(status) {
-    return CONFIG.HEALTH_STATUS?.[status]?.color || '#94a3b8';
+    return CONFIG.HEALTH_STATUS[status]?.color || '#94a3b8';
 }
 
 // Sağlık durumuna göre öncelik
@@ -132,7 +128,7 @@ function getHealthPriority(status) {
 
 // Sağlık durumunu görselleştir (harita için)
 function visualizeHealthOnMap(citizens) {
-    if (!window.map || !window.L) return;
+    if (!window.map) return;
 
     citizens.forEach(c => {
         if (!c.lat || !c.lng || !c.healthStatus) return;
@@ -142,14 +138,14 @@ function visualizeHealthOnMap(citizens) {
 
         if (priority >= 50) {
             // Kritik vakalar için daire
-            window.L.circleMarker([c.lat, c.lng], {
+            L.circleMarker([c.lat, c.lng], {
                 radius: 12,
                 color: color,
                 fillColor: color,
                 fillOpacity: 0.5,
                 weight: 3
             }).addTo(window.map).bindPopup(`
-                <b>${CONFIG.HEALTH_STATUS?.[c.healthStatus]?.icon || ''} ${c.healthStatus}</b><br>
+                <b>${CONFIG.HEALTH_STATUS[c.healthStatus]?.icon || ''} ${c.healthStatus}</b><br>
                 <small>${c.email}</small>
             `);
         }

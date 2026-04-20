@@ -1,10 +1,10 @@
-// TR-GÖZÜ Isı Haritası Modülü
+// TR-GOZU Isı Haritası Modülü
 
 let heatmapLayer = null;
 let heatmapEnabled = false;
 
 // Isı haritasını aç/kapat
-window.toggleHeatmap = function() {
+function toggleHeatmap() {
     heatmapEnabled = !heatmapEnabled;
     const btn = document.getElementById('btnHeatmap');
 
@@ -25,8 +25,8 @@ function showHeatmap() {
     hideHeatmap();
 
     // SOS verilerini al
-    const sosData = typeof getSOSHeatmapData === 'function' ? getSOSHeatmapData() : [];
-    const citizens = typeof getCitizens === 'function' ? getCitizens() : [];
+    const sosData = getSOSHeatmapData();
+    const citizens = getCitizens();
 
     // Vatandaş verilerini ekle
     citizens.forEach(c => {
@@ -77,7 +77,7 @@ function showHeatmap() {
 
 // Isı haritasını gizle
 function hideHeatmap() {
-    if (heatmapLayer && window.map) {
+    if (heatmapLayer) {
         window.map.removeLayer(heatmapLayer);
         heatmapLayer = null;
     }
@@ -107,8 +107,8 @@ function updateMapOverlay() {
 
     if (!panel || !title || !content) return;
 
-    const sosList = typeof getSOSList === 'function' ? getSOSList() : [];
-    const citizens = typeof getCitizens === 'function' ? getCitizens() : [];
+    const sosList = getSOSList();
+    const citizens = getCitizens();
 
     // İstatistikler
     const activeSOS = sosList.filter(s => !s.resolved).length;
@@ -152,8 +152,8 @@ function closeMapOverlay() {
 
 // Bölgesel yoğunluk hesapla
 function calculateRegionalDensity() {
-    const citizens = typeof getCitizens === 'function' ? getCitizens() : [];
-    const sosList = typeof getSOSList === 'function' ? getSOSList() : [];
+    const citizens = getCitizens();
+    const sosList = getSOSList();
     const gridSize = 0.5; // 0.5 derece (~55 km)
     const densityMap = {};
 
@@ -209,8 +209,6 @@ function calculateRegionalDensity() {
 
 // Kritik bölgeleri işaretle
 function markCriticalRegions() {
-    if (typeof CONFIG === 'undefined' || !CONFIG.PRIORITY_THRESHOLDS) return;
-
     const regions = calculateRegionalDensity();
 
     regions.forEach(region => {

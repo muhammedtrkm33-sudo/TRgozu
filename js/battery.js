@@ -28,7 +28,7 @@ async function initBatteryMonitor() {
         battery.addEventListener('chargingchange', () => {
             updateBatteryUI(battery);
             if (battery.charging) {
-                showToast('Şarj başladı! ⚡');
+                showToast('Şarj başladı! 🔌');
             }
         });
 
@@ -62,9 +62,9 @@ function updateBatteryUI(battery) {
     else if (level <= 30) color = 'var(--warning)';
 
     // İkon
-    let icon = '🔋';
-    if (level <= 10) icon = '🪫';
-    else if (level <= 30) icon = '⚠️';
+    let icon = '🟢';
+    if (level <= 10) icon = '🔴';
+    else if (level <= 30) icon = '🟡';
     if (battery.charging) icon = '⚡';
 
     if (batteryPercent) {
@@ -84,9 +84,7 @@ function updateBatteryUI(battery) {
 
 // Batarya eşiği kontrol et
 function checkBatteryThreshold(level) {
-    if (typeof CONFIG === 'undefined') return;
-
-    const threshold = (CONFIG.BATTERY_THRESHOLD || 20) / 100;
+    const threshold = CONFIG.BATTERY_THRESHOLD / 100;
     const now = Date.now();
 
     // Her 5 dakikada bir uyar
@@ -96,7 +94,7 @@ function checkBatteryThreshold(level) {
         STATE.batteryWarningShown = true;
         lastBatteryWarning = now;
 
-        showToast('🪫 Batarya kritik seviyede! Otomatik konum paylaşımı aktif.', 5000);
+        showToast('⚠️ Batarya kritik seviyede! Otomatik konum paylaşımı aktif.', 5000);
 
         // Kritik batarya durumunda SOS otomatik gönder
         if (STATE.isLocationActive && STATE.currentLocation) {
@@ -117,11 +115,9 @@ function checkBatteryThreshold(level) {
 // Alternatif batarya izleme (Device API yoksa)
 function monitorBatteryViaDeviceInfo() {
     const batteryDisplay = document.getElementById('batteryDisplay');
-    const batteryPercent = document.getElementById('batteryPercent');
-
     if (batteryDisplay) {
         batteryDisplay.classList.remove('hidden');
-        if (batteryPercent) batteryPercent.textContent = '🔋 Cihaz';
+        document.getElementById('batteryPercent').textContent = '⚡ Cihaz';
     }
 
     // Periyodik güncelleme (cihaz bilgisi)
@@ -129,7 +125,7 @@ function monitorBatteryViaDeviceInfo() {
     batteryMonitorInterval = setInterval(() => {
         if (STATE.currentLocation && STATE.batteryLevel) {
             // %10 altında kontrol
-            if (STATE.batteryLevel <= (CONFIG.BATTERY_THRESHOLD || 20)) {
+            if (STATE.batteryLevel <= CONFIG.BATTERY_THRESHOLD) {
                 checkBatteryThreshold(STATE.batteryLevel / 100);
             }
         }
@@ -150,7 +146,7 @@ function showCriticalBatteryWarning() {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
         <div class="modal-content modal-sm" style="text-align: center; border-color: var(--warning);">
-            <div style="font-size: 4rem; margin-bottom: 15px;">🪫</div>
+            <div style="font-size: 4rem; margin-bottom: 15px;">🔋</div>
             <h3 class="modal-title" style="color: var(--warning);">Kritik Batarya!</h3>
             <p style="color: var(--text-muted); margin: 15px 0;">
                 Bataryanız %${STATE.batteryLevel} seviyesinde.<br>

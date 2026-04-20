@@ -1,46 +1,31 @@
-// TR-GÖZÜ Kayıp Kişi Modülü
+// TR-GOZU Kayıp Kişi Modülü
 
 // Kayıp kişi modalını aç
 function openMissingPersonModal() {
-    const modal = document.getElementById('missingPersonModal');
-    if (modal) modal.classList.remove('hidden');
+    document.getElementById('missingPersonModal').classList.remove('hidden');
 }
 
 // Kayıp kişi modalını kapat
 function closeMissingPersonModal() {
-    const modal = document.getElementById('missingPersonModal');
-    if (modal) {
-        modal.classList.add('hidden');
-        // Formu temizle
-        const elements = ['missingName', 'missingAge', 'missingGender', 'missingLastSeen', 'missingLastSeenTime', 'missingNotes'];
-        elements.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                if (id === 'missingGender') el.value = 'erkek';
-                else el.value = '';
-            }
-        });
-    }
+    document.getElementById('missingPersonModal').classList.add('hidden');
+    // Formu temizle
+    document.getElementById('missingName').value = '';
+    document.getElementById('missingAge').value = '';
+    document.getElementById('missingGender').value = 'erkek';
+    document.getElementById('missingLastSeen').value = '';
+    document.getElementById('missingLastSeenTime').value = '';
+    document.getElementById('missingNotes').value = '';
 }
 
 // Kayıp kişi bildir
 function submitMissingPerson() {
-    const nameInput = document.getElementById('missingName');
-    const ageInput = document.getElementById('missingAge');
-    const genderInput = document.getElementById('missingGender');
-    const lastSeenInput = document.getElementById('missingLastSeen');
-    const lastSeenTimeInput = document.getElementById('missingLastSeenTime');
-    const notesInput = document.getElementById('missingNotes');
-
-    if (!nameInput) return;
-
-    const name = nameInput.value.trim();
-    const age = ageInput ? ageInput.value.trim() : '';
-    const gender = genderInput ? genderInput.value : 'erkek';
-    const lastSeen = lastSeenInput ? lastSeenInput.value.trim() : '';
-    const lastSeenTime = lastSeenTimeInput ? lastSeenTimeInput.value : '';
-    const notes = notesInput ? notesInput.value.trim() : '';
-    const email = typeof getCurrentUserEmail === 'function' ? getCurrentUserEmail() : 'anonim';
+    const name = document.getElementById('missingName').value.trim();
+    const age = document.getElementById('missingAge').value.trim();
+    const gender = document.getElementById('missingGender').value;
+    const lastSeen = document.getElementById('missingLastSeen').value.trim();
+    const lastSeenTime = document.getElementById('missingLastSeenTime').value;
+    const notes = document.getElementById('missingNotes').value.trim();
+    const email = getCurrentUserEmail();
 
     if (!name) {
         showToast('İsim gerekli!');
@@ -48,15 +33,15 @@ function submitMissingPerson() {
     }
 
     const missing = {
-        id: typeof generateId === 'function' ? generateId() : Date.now().toString(),
+        id: generateId(),
         reportedBy: email,
         name,
-        age: age ? parseInt(age, 10) : null,
+        age: age ? parseInt(age) : null,
         gender,
         lastSeen,
         lastSeenTime: lastSeenTime || null,
         notes,
-        location: (window.STATE && window.STATE.currentLocation) ? window.STATE.currentLocation : null,
+        location: STATE.currentLocation,
         status: 'missing',
         found: false,
         createdAt: new Date().toISOString()
@@ -71,7 +56,7 @@ function submitMissingPerson() {
     loadMissingPersons();
 
     showToast('Kayıp kişi bildirildi!');
-    if (typeof playSound === 'function') playSound('alert');
+    playSound('alert');
 }
 
 // Kayıp kişileri al
@@ -90,31 +75,36 @@ function loadMissingPersons() {
     const active = missingList.filter(m => !m.found);
 
     if (active.length === 0) {
-        list.innerHTML = '<p style="font-size: 11px; color: var(--text-dim); padding: 10px;">Henüz kayıp kişi bildirimi yok.</p>';
+        list.innerHTML = '<p style="font-size: 11px; color: var(--text-dim);">Kayıp kişi yok.</p>';
         return;
     }
 
     list.innerHTML = active.map(m => `
-        <div class="missing-card" onclick="viewMissingPerson('${m.id}')" style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(255,71,87,0.2);">
+        <div class="missing-card" onclick="viewMissingPerson('${m.id}')">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: 600; color: #fff;">${typeof escapeHtml === 'function' ? escapeHtml(m.name) : m.name}</span>
-                ${m.age ? `<span style="font-size: 11px; color: #94a3b8;">${m.age} yaş</span>` : ''}
+                <span style="font-weight: 600;">${escapeHtml(m.name)}</span>
+                ${m.age ? `<span style="font-size: 11px; color: var(--text-muted);">${m.age} yaş</span>` : ''}
             </div>
-            <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
                 ${getGenderIcon(m.gender)} ${m.gender === 'erkek' ? 'Erkek' : m.gender === 'kadin' ? 'Kadın' : 'Diğer'}
             </div>
             ${m.lastSeen ? `
-                <div style="font-size: 10px; color: #ffa502; margin-top: 4px;">
-                     📍 Son görülme: ${typeof escapeHtml === 'function' ? escapeHtml(m.lastSeen) : m.lastSeen}
+                <div style="font-size: 10px; color: var(--warning); margin-top: 4px;">
+                    📍 Son görülme: ${escapeHtml(m.lastSeen)}
+                </div>
+            ` : ''}
+            ${m.lastSeenTime ? `
+                <div style="font-size: 10px; color: var(--text-dim);">
+                    🕐 ${formatDate(m.lastSeenTime)}
                 </div>
             ` : ''}
             <div style="font-size: 10px; color: var(--text-dim); margin-top: 4px;">
-                👤 Bildiren: ${m.reportedBy}
+                Bildiren: ${m.reportedBy}
             </div>
-            ${(window.STATE && window.STATE.userRole === 'admin') ? `
-                <button class="btn btn-success btn-sm" style="margin-top: 8px; padding: 6px; width: 100%; font-size: 11px;"
+            ${STATE.userRole === 'admin' ? `
+                <button class="btn btn-success btn-sm" style="margin-top: 8px; padding: 6px;"
                         onclick="markAsFound('${m.id}', event)">
-                     ✅ Bulundu İşaretle
+                    ✅ Bulundu İşaretle
                 </button>
             ` : ''}
         </div>
@@ -129,22 +119,20 @@ function viewMissingPerson(id) {
     if (!person) return;
 
     // Haritaya git
-    if (person.location && typeof flyToLocation === 'function') {
+    if (person.location) {
         flyToLocation(person.location.lat, person.location.lng, 15);
-        if (typeof addMarkerToMap === 'function') {
-            addMarkerToMap(person.location.lat, person.location.lng, '#ff4757', `Kayıp: ${person.name}`);
-        }
+        addMarkerToMap(person.location.lat, person.location.lng, '#ff4757', `Kayıp: ${person.name}`);
     }
 
-    // Detay göster (Modern bir modal yerine basit alert şimdilik)
+    // Detay göster
     alert(`
-        🔍 Kayıp Kişi Bilgileri
-        
+        Kayıp Kişi Bilgileri
+        ───────────────────
         İsim: ${person.name}
         Yaş: ${person.age || 'Bilgi yok'}
         Cinsiyet: ${person.gender === 'erkek' ? 'Erkek' : person.gender === 'kadin' ? 'Kadın' : 'Diğer'}
         Son Görülme: ${person.lastSeen || 'Bilgi yok'}
-        Son Görülme Zamanı: ${person.lastSeenTime ? person.lastSeenTime : 'Bilgi yok'}
+        Son Görülme Zamanı: ${person.lastSeenTime ? formatDate(person.lastSeenTime) : 'Bilgi yok'}
         Notlar: ${person.notes || 'Yok'}
         Bildiren: ${person.reportedBy}
     `);
@@ -152,7 +140,7 @@ function viewMissingPerson(id) {
 
 // Bulundu işaretle
 function markAsFound(id, event) {
-    if (event) event.stopPropagation();
+    event.stopPropagation();
 
     if (!confirm('Bu kişiyi bulundu olarak işaretlemek istediğinize emin misiniz?')) return;
 
@@ -162,12 +150,12 @@ function markAsFound(id, event) {
     if (person) {
         person.found = true;
         person.foundAt = new Date().toISOString();
-        person.foundBy = typeof getCurrentUserEmail === 'function' ? getCurrentUserEmail() : 'admin';
+        person.foundBy = getCurrentUserEmail();
         saveToStorage('missingPersons', missingList);
         loadMissingPersons();
 
         showToast(`${person.name} bulundu olarak işaretlendi!`);
-        if (typeof playSound === 'function') playSound('success');
+        playSound('success');
     }
 }
 
@@ -180,12 +168,11 @@ function getGenderIcon(gender) {
 
 // Kayıp kişiyi haritada göster
 function showMissingPersonsOnMap() {
-    if (!window.map) return;
     const missingList = getMissingPersons();
     const active = missingList.filter(m => !m.found);
 
     active.forEach(m => {
-        if (m.location && m.location.lat && m.location.lng) {
+        if (m.location) {
             L.circleMarker([m.location.lat, m.location.lng], {
                 radius: 12,
                 color: '#ff4757',
@@ -193,10 +180,10 @@ function showMissingPersonsOnMap() {
                 fillOpacity: 0.5,
                 weight: 2
             }).addTo(window.map).bindPopup(`
-                <b style="color: #ff4757">🔍 Kayıp Kişi</b><br>
-                <b>${typeof escapeHtml === 'function' ? escapeHtml(m.name) : m.name}</b><br>
+                <b style="color: #ff4757">🔴 Kayıp Kişi</b><br>
+                <b>${escapeHtml(m.name)}</b><br>
                 ${m.age ? `${m.age} yaş` : ''}<br>
-                Son görülme: ${typeof escapeHtml === 'function' ? escapeHtml(m.lastSeen || '-') : (m.lastSeen || '-')}
+                Son görülme: ${escapeHtml(m.lastSeen || '-')}
             `);
         }
     });
@@ -210,30 +197,27 @@ function loadAdminMissingPersons() {
     const missingList = getMissingPersons();
 
     if (missingList.length === 0) {
-        list.innerHTML = '<p style="font-size: 11px; color: var(--text-dim); padding: 10px;">Henüz kayıt yok.</p>';
+        list.innerHTML = '<p style="font-size: 11px; color: var(--text-dim);">Kayıp kişi yok.</p>';
         return;
     }
 
     list.innerHTML = missingList.map(m => {
-        const statusClass = m.found ? 'background: rgba(46,204,113,0.1); border-color: rgba(46,204,113,0.3);' : '';
-        const statusBadge = m.found ? '✅ BULUNDU' : '🔍 KAYIP';
+        const statusClass = m.found ? 'background: rgba(46,204,113,0.1);' : '';
+        const statusBadge = m.found ? '✅ BULUNDU' : '🔴 KAYIP';
 
         return `
-            <div class="admin-card missing-card" style="${statusClass} margin-bottom: 8px; padding: 10px; border-radius: 8px;" onclick="viewMissingPerson('${m.id}')">
+            <div class="missing-card" style="${statusClass}" onclick="viewMissingPerson('${m.id}')">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 600; color: #fff;">${typeof escapeHtml === 'function' ? escapeHtml(m.name) : m.name}</span>
-                    <span style="font-size: 10px; color: ${m.found ? '#2ecc71' : '#ff4757'}; font-weight: bold;">
+                    <span style="font-weight: 600;">${escapeHtml(m.name)}</span>
+                    <span style="font-size: 10px; color: ${m.found ? 'var(--success)' : 'var(--primary)'};">
                         ${statusBadge}
                     </span>
                 </div>
                 ${m.location ? `
-                    <div style="font-size: 10px; color: #2ecc71; margin-top: 4px;">
-                         📍 Konum kaydedildi
+                    <div style="font-size: 10px; color: var(--success); margin-top: 4px;">
+                        📍 Konum kaydedildi
                     </div>
                 ` : ''}
-                <div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">
-                     👤 Bildiren: ${m.reportedBy}
-                </div>
             </div>
         `;
     }).join('');
