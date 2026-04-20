@@ -2,10 +2,10 @@
   "name": "tr-gozu",
   "version": "1.0.0",
   "description": "TR-GOZU Acil Durum Yönetim Sistemi",
-  "main": "js/server.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node js/server.js"
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",

@@ -1,13 +1,13 @@
-const express = require('express');
+﻿const express = require('express');
 const fs = require('fs');
 const cors = require('cors');
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('..'));
+app.use(express.static('.'));
 
-const USERS_FILE = './users.json';
+const USERS_FILE = './assets/js/users.json';
 const SOS_FILE = './sos.json';
 const MESSAGES_FILE = './messages.json';
 const VOLUNTEERS_FILE = './volunteers.json';
