@@ -227,6 +227,16 @@ body {
 }
 .btn-outline:hover { background: rgba(0, 210, 255, 0.1); }
 
+.btn-link {
+    background: transparent;
+    color: var(--text-muted);
+    border: none;
+    text-decoration: underline;
+    font-size: 0.875rem;
+    padding: 8px 0;
+}
+.btn-link:hover { color: var(--secondary); background: transparent; }
+
 .btn-success { background: var(--success); color: white; }
 .btn-danger { background: var(--danger); color: white; }
 
