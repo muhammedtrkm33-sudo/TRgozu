@@ -1,12 +1,12 @@
-// Hava kalitesi - OpenWeather Air Pollution API
+// Hava kalitesi — OpenWeather Air Pollution API
 let aqiPopup = null;
 
-const AQ_LEVELS = [
-    { max: 1, label: 'Çok iyi', color: '#2ecc71', emoji: '✅', desc: 'Hava kalitesi iyi; açık hava uygundur.' },
-    { max: 2, label: 'İyi', color: '#a3cb38', emoji: '🟢', desc: 'Hava kalitesi kabul edilebilir.' },
-    { max: 3, label: 'Orta', color: '#f1c40f', emoji: '🟡', desc: 'Hassas gruplar için hafif etki olabilir.' },
-    { max: 4, label: 'Kötü', color: '#e67e22', emoji: '🟠', desc: 'Uzun süre açık havada egzersizden kaçının.' },
-    { max: 5, label: 'Çok kötü', color: '#e74c3c', emoji: '🔴', desc: 'Sağlık riski yüksek olabilir; gereksiz dışarı çıkmayın.' }
+const AQI_LEVELS = [
+    { max: 1, label: 'Çok iyi', color: '#2ecc71', emoji: '😊', desc: 'Hava kalitesi iyi; açık hava uygundur.' },
+    { max: 2, label: 'İyi', color: '#a3cb38', emoji: '🙂', desc: 'Hava kalitesi kabul edilebilir.' },
+    { max: 3, label: 'Orta', color: '#f1c40f', emoji: '😐', desc: 'Hassas gruplar için hafif etki olabilir.' },
+    { max: 4, label: 'Kötü', color: '#e67e22', emoji: '😷', desc: 'Uzun süre açık havada egzersizden kaçının.' },
+    { max: 5, label: 'Çok kötü', color: '#e74c3c', emoji: '🚨', desc: 'Sağlık riski yüksek olabilir; gereksiz dışarı çıkmayın.' }
 ];
 
 async function fetchAndShowAirQuality(lat, lng) {
@@ -16,12 +16,7 @@ async function fetchAndShowAirQuality(lat, lng) {
     }
 
     try {
-        if (typeof CONFIG === 'undefined' || !CONFIG.WEATHER_API_KEY) {
-            console.error('Hava kalitesi hatası: API anahtarı bulunamadı.');
-            return;
-        }
-
-        const response = await fetchWithRetry(
+        const response = await fetch(
             `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lng}&appid=${CONFIG.WEATHER_API_KEY}`
         );
 
@@ -34,7 +29,7 @@ async function fetchAndShowAirQuality(lat, lng) {
         const aqi = aqiData.main.aqi;
         const comp = aqiData.components;
 
-        const level = AQ_LEVELS[Math.min(aqi - 1, 4)];
+        const level = AQI_LEVELS[Math.min(aqi - 1, 4)];
 
         const popupContent = `
             <div style="min-width:200px;font-size:12px">
@@ -43,11 +38,11 @@ async function fetchAndShowAirQuality(lat, lng) {
                 </div>
                 <div style="color:#888;margin-bottom:8px;font-size:11px">${level.desc}</div>
                 <table style="width:100%;font-size:11px;border-collapse:collapse">
-                    <tr><td style="color:#aaa">PM2.5</td><td><b>${comp.pm2_5.toFixed(1)}</b> µg/m³</td></tr>
-                    <tr><td style="color:#aaa">PM10</td><td><b>${comp.pm10.toFixed(1)}</b> µg/m³</td></tr>
-                    <tr><td style="color:#aaa">NO₂</td><td><b>${comp.no2.toFixed(1)}</b> µg/m³</td></tr>
-                    <tr><td style="color:#aaa">O₃</td><td><b>${comp.o3.toFixed(1)}</b> µg/m³</td></tr>
-                    <tr><td style="color:#aaa">CO</td><td><b>${comp.co.toFixed(0)}</b> µg/m³</td></tr>
+                    <tr><td style="color:#aaa">PM2.5</td><td><b>${comp.pm2_5.toFixed(1)}</b> μg/m³</td></tr>
+                    <tr><td style="color:#aaa">PM10</td><td><b>${comp.pm10.toFixed(1)}</b> μg/m³</td></tr>
+                    <tr><td style="color:#aaa">NO₂</td><td><b>${comp.no2.toFixed(1)}</b> μg/m³</td></tr>
+                    <tr><td style="color:#aaa">O₃</td><td><b>${comp.o3.toFixed(1)}</b> μg/m³</td></tr>
+                    <tr><td style="color:#aaa">CO</td><td><b>${comp.co.toFixed(0)}</b> μg/m³</td></tr>
                 </table>
                 <div style="color:#555;font-size:9px;margin-top:6px">OpenWeather Air Pollution</div>
             </div>
@@ -60,13 +55,13 @@ async function fetchAndShowAirQuality(lat, lng) {
                 .openOn(window.map);
         }
 
-        updateAQBar(aqi, level);
+        updateAQIBar(aqi, level);
     } catch (err) {
-        console.error('Hava kalitesi hatası:', err);
+        console.error('Hava kalitesi:', err);
     }
 }
 
-function updateAQBar(aqi, level) {
+function updateAQIBar(aqi, level) {
     const aqiEl = document.getElementById('val-air-quality');
     if (aqiEl) {
         const em = level.emoji ? `${level.emoji} ` : '';
