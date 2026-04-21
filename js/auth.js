@@ -386,3 +386,50 @@ function logout() {
         showToast('Güvenli çıkış yapıldı.');
     }
 }
+// Şifremi Unuttum Fonksiyonu
+async function forgotPassword() {
+    const emailInput = document.getElementById('c_user');
+    const email = emailInput.value.trim().toLowerCase();
+
+    // 1. Boş kontrolü (İstediğin kısım)
+    if (!email) {
+        showToast("Lütfen önce e-posta adresinizi giriniz!");
+        emailInput.focus();
+        // Görsel efekt: inputu salla veya vurgula
+        emailInput.style.border = "2px solid var(--primary)";
+        setTimeout(() => emailInput.style.border = "", 2000);
+        return;
+    }
+
+    // 2. Format kontrolü
+    if (!isValidEmail(email) || !email.endsWith("@gmail.com")) {
+        showToast("Lütfen geçerli bir @gmail.com adresi girin!");
+        return;
+    }
+
+    // 3. Kullanıcıya onay sor
+    const onay = confirm(`${email} adresine yeni bir şifre gönderilmesini onaylıyor musunuz?`);
+    if (!onay) return;
+
+    showToast("Şifre sıfırlama isteği gönderiliyor...");
+
+    try {
+        // Render'daki backend API'sine istek atıyoruz
+        const response = await fetch('/api/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert("Şifreniz başarıyla sıfırlandı! Yeni şifreniz e-posta adresinize gönderildi. Lütfen Gereksiz (Spam) kutusunu da kontrol edin.");
+        } else {
+            showToast("Hata: " + data.message);
+        }
+    } catch (error) {
+        console.error("Sıfırlama hatası:", error);
+        showToast("Sunucuya bağlanılamadı. Lütfen internetinizi kontrol edin.");
+    }
+}
