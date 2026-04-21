@@ -1,11 +1,36 @@
 ﻿const express = require('express');
 const fs = require('fs');
 const cors = require('cors');
+const nodemailer = require('nodemailer');
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
+
+// Email transporter (Gmail için)
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER || 'trgozu@gmail.com', // Environment variable
+        pass: process.env.EMAIL_PASS || 'czclgweldsrwlsnx' // App password
+    }
+});
+
+// Email gönderme fonksiyonu
+const sendEmail = async (to, subject, html) => {
+    try {
+        await transporter.sendMail({
+            from: process.env.EMAIL_USER || 'trgozu@gmail.com',
+            to,
+            subject,
+            html
+        });
+        console.log(`Email sent to ${to}`);
+    } catch (error) {
+        console.error('Email send error:', error);
+    }
+};
 
 const USERS_FILE = './assets/js/users.json';
 const SOS_FILE = './sos.json';
@@ -26,6 +51,19 @@ app.post('/save-user', (req, res) => {
         if (user) return res.status(400).json({ success: false, message: "Bu email zaten kayitli!" });
         users.push({ email, pass, created: new Date().toISOString(), lat: null, lng: null, lastActive: null, healthStatus: null, battery: null, isSOS: false, isPanic: false });
         writeJSON(USERS_FILE, users);
+        
+        // Hoşgeldin maili gönder
+        const welcomeHtml = `
+            <h2>TR-GOZU'ya Hoş Geldiniz!</h2>
+            <p>Merhaba,</p>
+            <p>TR-GOZU Acil Durum Yönetim Sistemi'ne başarıyla kayıt oldunuz.</p>
+            <p>Afet anlarında hayat kurtarmak için buradayız. Uygulamayı kullanarak konumunuzu paylaşabilir, yardım taleplerinde bulunabilirsiniz.</p>
+            <p>Güvenliğiniz bizim önceliğimizdir.</p>
+            <br>
+            <p>Saygılarımla,<br>TR-GOZU Ekibi</p>
+        `;
+        sendEmail(email, 'TR-GOZU\'ya Hoş Geldiniz!', welcomeHtml);
+        
         return res.json({ success: true, message: "Kayit basarili!" });
     }
     if (mode === 'login') {
@@ -88,5 +126,35 @@ app.post('/api/volunteers', (req, res) => {
 });
 
 app.get('/api/volunteers', (req, res) => res.json(readJSON(VOLUNTEERS_FILE)));
+
+// Şifre sıfırlama
+app.post('/api/forgot-password', (req, res) => {
+    const { email } = req.body;
+    let users = readJSON(USERS_FILE);
+    const user = users.find(u => u.email === email);
+    
+    if (!user) {
+        return res.status(404).json({ success: false, message: "Bu email ile kayıtlı kullanıcı bulunamadı!" });
+    }
+    
+    // Yeni şifre oluştur
+    const newPass = Math.random().toString(36).slice(-8);
+    user.pass = newPass;
+    writeJSON(USERS_FILE, users);
+    
+    // Şifre sıfırlama maili gönder
+    const resetHtml = `
+        <h2>Şifre Sıfırlama</h2>
+        <p>Merhaba,</p>
+        <p>TR-GOZU hesabınızın şifresi sıfırlandı.</p>
+        <p><strong>Yeni şifreniz:</strong> ${newPass}</p>
+        <p>Lütfen giriş yaptıktan sonra şifrenizi değiştirin.</p>
+        <br>
+        <p>Saygılarımla,<br>TR-GOZU Ekibi</p>
+    `;
+    sendEmail(email, 'TR-GOZU Şifre Sıfırlama', resetHtml);
+    
+    res.json({ success: true, message: "Şifre sıfırlama maili gönderildi!" });
+});
 
 app.listen(process.env.PORT || 3000, () => console.log("TR-GOZU Backend " + (process.env.PORT || 3000) + " portunda aktif!"));
