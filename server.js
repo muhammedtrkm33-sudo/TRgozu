@@ -74,10 +74,14 @@ app.post('/save-user', (req, res) => {
 
     if (mode === 'reg') {
         if (user) return res.status(400).json({ success: false, message: "Bu email zaten kayıtlı!" });
-        users.push({ email, pass, created: new Date().toISOString() });
+        
+        const verificationToken = Math.random().toString(36).slice(-12);
+        users.push({ email, pass, created: new Date().toISOString(), isVerified: false, verificationToken });
         writeJSON(USERS_FILE, users);
-        sendEmail(email, 'Hoş Geldiniz', '<h2>TR-GOZU Kaydı Başarılı!</h2>');
-        return res.json({ success: true, message: "Kayıt başarılı!" });
+        
+        const verifyLink = `http://localhost:3000/verify-email.html?token=${verificationToken}`;
+        sendEmail(email, 'Email Doğrulama', `<p>Hesabınızı doğrulamak için <a href="${verifyLink}">buraya tıklayın</a>.</p><p>Doğrulama sonrası şifreniz: <b>${pass}</b></p>`);
+        return res.json({ success: true, message: "Kayıt başarılı! Emailinizi doğrulayın." });
     }
 
     if (mode === 'login') {
