@@ -357,5 +357,11 @@ function switchMessagingTab(tab) {
         regionView.classList.remove('hidden');
         dmView.classList.add('hidden');
         loadRegionChat();
-    }
 }
+// Yetkili paneli açıksa her 5 saniyede bir yeni mesajları kontrol et
+if (STATE.userRole === 'admin') {
+    setInterval(() => {
+        loadAdminMessages(); // Mesajları sunucudan çeken fonksiyonun
+    }, 5000); 
+
+}}
