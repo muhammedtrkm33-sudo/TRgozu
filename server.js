@@ -40,6 +40,7 @@ const sendEmail = async (to, subject, html) => {
 
 // DOSYA YOLLARI: Render'da silinmemesi için garantili yol
 const USERS_FILE = path.join(__dirname, 'users.json');
+const MESSAGES_FILE = path.join(__dirname, 'messages.json');
 
 const readJSON = (file) => {
     if (!fs.existsSync(file)) return [];
@@ -100,6 +101,13 @@ app.post('/api/forgot-password', (req, res) => {
     
     sendEmail(email, 'Yeni Şifre', `<p>Yeni şifreniz: <b>${newPass}</b></p>`);
     res.json({ success: true, message: "Mail gönderildi!" });
+});
+
+app.get('/api/messages/:userId', (req, res) => {
+    const msgs = readJSON(MESSAGES_FILE);
+    const userId = decodeURIComponent(req.params.userId);
+    // Burada hem gelen hem giden mesajları eksiksiz döndürdüğünden emin ol
+    res.json(msgs.filter(m => m.from === userId || m.to === userId || m.to === 'ADMIN'));
 });
 
 // SUNUCUYU BAŞLAT
