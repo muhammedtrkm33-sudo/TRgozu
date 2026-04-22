@@ -82,6 +82,7 @@ app.post('/save-user', (req, res) => {
 
     if (mode === 'login') {
         if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı!" });
+        if (!user.isVerified) return res.status(403).json({ success: false, message: "Email doğrulanmamış!" });
         if (user.pass !== pass) return res.status(401).json({ success: false, message: "Şifre yanlış!" });
         return res.json({ success: true, message: "Giriş başarılı." });
     }
@@ -95,12 +96,29 @@ app.post('/api/forgot-password', (req, res) => {
     
     if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
     
-    const newPass = Math.random().toString(36).slice(-8);
-    user.pass = newPass;
+    const resetToken = Math.random().toString(36).slice(-12);
+    user.resetToken = resetToken;
+    user.resetExpires = Date.now() + 3600000; // 1 saat
     writeJSON(USERS_FILE, users);
     
-    sendEmail(email, 'Yeni Şifre', `<p>Yeni şifreniz: <b>${newPass}</b></p>`);
-    res.json({ success: true, message: "Mail gönderildi!" });
+    const resetLink = `http://localhost:3000/reset-password.html?token=${resetToken}`;
+    sendEmail(email, 'Şifre Sıfırlama', `<p>Şifrenizi sıfırlamak için <a href="${resetLink}">buraya tıklayın</a>.</p><p>Link 1 saat geçerlidir.</p>`);
+    res.json({ success: true, message: "Şifre sıfırlama maili gönderildi!" });
+});
+
+app.post('/api/reset-password', (req, res) => {
+    const { token, newPassword } = req.body;
+    let users = readJSON(USERS_FILE);
+    const user = users.find(u => u.resetToken === token && u.resetExpires > Date.now());
+    
+    if (!user) return res.status(400).json({ success: false, message: "Geçersiz veya süresi dolmuş token!" });
+    
+    user.pass = newPassword;
+    delete user.resetToken;
+    delete user.resetExpires;
+    writeJSON(USERS_FILE, users);
+    
+    res.json({ success: true, message: "Şifre başarıyla güncellendi!" });
 });
 
 app.get('/api/messages/:userId', (req, res) => {
