@@ -3,9 +3,68 @@
 let sosCountdownTimer = null;
 let sosCount = 0;
 let lastSosTime = 0;
+let sosCooldownTimer = null;
+let sosCooldownRemaining = 0;
+
+function formatSOSCooldown(seconds) {
+    const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const secs = (seconds % 60).toString().padStart(2, '0');
+    return `${minutes}:${secs}`;
+}
+
+function updateSOSCooldownBadge() {
+    const badge = document.getElementById('sosCooldownBadge');
+    if (!badge) return;
+    if (sosCooldownRemaining <= 0) {
+        badge.classList.add('hidden');
+        badge.textContent = formatSOSCooldown(CONFIG.SOS_COOLDOWN_SECONDS);
+        return;
+    }
+    badge.textContent = formatSOSCooldown(sosCooldownRemaining);
+    badge.classList.remove('hidden');
+}
+
+function setSOSButtonDisabled(disabled) {
+    const button = document.getElementById('sosBtn');
+    if (!button) return;
+    button.disabled = disabled;
+    if (disabled) button.classList.add('disabled');
+    else button.classList.remove('disabled');
+}
+
+function startSOSCooldown(seconds = CONFIG.SOS_COOLDOWN_SECONDS) {
+    if (sosCooldownTimer) clearInterval(sosCooldownTimer);
+    sosCooldownRemaining = seconds;
+    setSOSButtonDisabled(true);
+    updateSOSCooldownBadge();
+
+    sosCooldownTimer = setInterval(() => {
+        sosCooldownRemaining -= 1;
+        if (sosCooldownRemaining <= 0) {
+            stopSOSCooldown();
+            return;
+        }
+        updateSOSCooldownBadge();
+    }, 1000);
+}
+
+function stopSOSCooldown() {
+    if (sosCooldownTimer) {
+        clearInterval(sosCooldownTimer);
+        sosCooldownTimer = null;
+    }
+    sosCooldownRemaining = 0;
+    setSOSButtonDisabled(false);
+    updateSOSCooldownBadge();
+}
 
 // SOS'i tetikle
 function triggerSOS() {
+    if (sosCooldownRemaining > 0) {
+        showToast(`SOS butonunu tekrar kullanmak için ${formatSOSCooldown(sosCooldownRemaining)} bekleyin.`);
+        return;
+    }
+
     const modal = document.getElementById('sosModal');
     if (!modal) return;
 
@@ -25,6 +84,9 @@ function triggerSOS() {
         sosCount = 1;
     }
     lastSosTime = now;
+
+    // SOS cooldown başlat
+    startSOSCooldown();
 
     // SOS modalini göster
     modal.classList.remove('hidden');
