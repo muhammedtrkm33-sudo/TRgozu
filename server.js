@@ -7,6 +7,9 @@ const session = require('express-session');
 const sqlite3 = require('sqlite3').verbose();
 const app = express();
 
+// Aktif vatandaşları takip etmek için global array
+let activeCitizens = [];
+
 // CORS Ayarı: Her yerden gelen isteğe izin ver (Android ve Web için şart)
 app.use(cors());
 app.use(express.json());
