@@ -288,14 +288,3 @@ app.get('/api/messages/:userId', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`Sunucu ${PORT} portunda tam yetkiyle aktif!`);
 });
-
-// Uygulama kapatıldığında veritabanını kapat
-process.on('exit', () => {
-    db.close((err) => {
-        if (err) {
-            console.error('Veritabanı kapatma hatası:', err.message);
-        } else {
-            console.log('Veritabanı bağlantısı kapatıldı.');
-        }
-    });
-});
