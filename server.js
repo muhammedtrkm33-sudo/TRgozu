@@ -196,7 +196,15 @@ app.post('/api/verify-registration', (req, res) => {
     delete user.verificationCode;
     delete user.verificationExpires;
     writeJSON(USERS_FILE, users);
-    res.json({ success: true, message: "Hesabınız doğrulandı! Şimdi giriş yapabilirsiniz." });
+    
+    // Doğrulama sonrası otomatik giriş için session oluştur
+    req.session.user = {
+        email: user.email,
+        role: 'citizen',
+        loginTime: new Date().toISOString()
+    };
+    
+    res.json({ success: true, message: "Hesabınız doğrulandı! Hoş geldiniz." });
 });
 
 app.post('/api/resend-verification-code', (req, res) => {
