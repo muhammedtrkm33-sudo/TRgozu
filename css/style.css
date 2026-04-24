@@ -1012,11 +1012,7 @@ select {
     transition: transform 0.2s;
 }
 
-.sos-btn:hover { transform: scale(1.1); }
-.sos-btn:active { transform: scale(0.95); }
-.sos-btn.panic { animation: sosPanic 0.3s infinite; background: linear-gradient(135deg, #ff0000, #8b0000); }
-
-@keyframes sosPulse {
+},{
     0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.7); }
     70% { box-shadow: 0 0 0 30px rgba(255, 71, 87, 0); }
     100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
