@@ -9,6 +9,27 @@ const ADMIN_KEYS = {
 
 let tempUserData = null;
 
+// Sayfa yüklendiğinde session kontrolü
+async function initAuth() {
+    try {
+        const res = await fetch('/check-session');
+        const data = await res.json();
+        if (data.loggedIn) {
+            // Session var, direkt ana uygulamaya geç
+            STATE.userRole = data.user.role;
+            tempUserData = data.user;
+            setCurrentUserEmail(data.user.email);
+            document.getElementById('authSection').classList.add('hidden');
+            initSystem();
+        }
+    } catch (e) {
+        console.log('Session kontrolü başarısız, giriş ekranı gösteriliyor');
+    }
+}
+
+// Sayfa yüklendiğinde çalıştır
+document.addEventListener('DOMContentLoaded', initAuth);
+
 // Giriş türünü değiştir
 function switchAuth(type) {
     document.getElementById('citizenForm').classList.toggle('hidden', type !== 'citizen');
@@ -98,24 +119,26 @@ async function valideGiris() {
     } catch (e) { showToast('Giriş başarısız, sunucuya ulaşılamıyor!'); }
 }
 
-// --- ŞİFREMİ UNUTTUM (İstediğin Mantık) ---
-async function forgotPassword() {
-    const emailInput = document.getElementById('c_user');
-    const email = emailInput.value.trim().toLowerCase();
+let forgotEmailSent = false;
 
-    // 1. Boşluk Kontrolü
-    if (!email) {
-        showToast("HATA: E-posta alanı boş kalamaz!");
-        emailInput.style.border = "2px solid #ef4444"; // Kırmızı vurgu
-        emailInput.focus();
-        setTimeout(() => emailInput.style.border = "", 2000);
+function forgotPassword() {
+    document.getElementById('forgot_email').value = document.getElementById('c_user').value.trim().toLowerCase();
+    document.getElementById('forgot_code').value = '';
+    document.getElementById('forgot_new_pass').value = '';
+    document.getElementById('forgotStatus').textContent = 'Kayıtlı e-posta adresinizi girin. Doğrulama kodu gönderilecektir.';
+    document.getElementById('forgotModal').classList.remove('hidden');
+}
+
+function closeForgotModal() {
+    document.getElementById('forgotModal').classList.add('hidden');
+}
+
+async function sendForgotCode() {
+    const email = document.getElementById('forgot_email').value.trim().toLowerCase();
+    if (!email || !isValidEmail(email)) {
+        showToast('Lütfen geçerli bir e-posta girin!');
         return;
     }
-
-    if (!isValidEmail(email)) { showToast("Lütfen geçerli bir e-posta girin!"); return; }
-
-    const onay = confirm(email + " adresine yeni bir şifre gönderilsin mi?");
-    if (!onay) return;
 
     try {
         const res = await fetch('/api/forgot-password', {
@@ -125,22 +148,66 @@ async function forgotPassword() {
         });
         const data = await res.json();
         if (data.success) {
-            alert("Şifreniz sıfırlandı! Yeni şifreniz Gmail adresinize gönderildi.");
+            forgotEmailSent = true;
+            document.getElementById('forgotStatus').textContent = 'Doğrulama kodu gönderildi. Mailinizi kontrol edin.';
+            showToast(data.message);
         } else {
-            alert("Hata: " + data.message); // Sunucuda kayıtlı değilse burası çalışır
+            showToast(data.message);
         }
-    } catch (e) { showToast("İşlem başarısız!"); }
+    } catch (e) {
+        showToast('Sunucuya bağlanamadı!');
+    }
 }
 
-// Yetkili girişi (Yerel Anahtarlar)
-function handleAdminGirisLocal() {
+async function resetPasswordWithCode() {
+    const email = document.getElementById('forgot_email').value.trim().toLowerCase();
+    const code = document.getElementById('forgot_code').value.trim();
+    const newPass = document.getElementById('forgot_new_pass').value;
+
+    if (!email || !isValidEmail(email)) { showToast('Geçerli bir e-posta girin!'); return; }
+    if (!code) { showToast('Lütfen kodu girin!'); return; }
+    if (newPass.length < 4) { showToast('Yeni şifre en az 4 karakter olmalıdır!'); return; }
+
+    try {
+        const res = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, token: code, newPassword: newPass })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            closeForgotModal();
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) {
+        showToast('Şifre güncelleme başarısız oldu!');
+    }
+}
+
+// Yetkili girişi (Server odaklı)
+async function handleAdminGirisLocal() {
     const key = document.getElementById('admin_key').value.trim();
-    const unit = ADMIN_KEYS[key];
-    if (unit) {
-        STATE.userRole = 'admin';
-        tempUserData = { email: 'YETKILI@ADMIN', unit: unit, tc: unit };
-        showContract();
-    } else { showToast('Hatalı Yetkili Anahtarı!'); }
+    
+    if (!key) { showToast('Yetkili anahtarı gerekli!'); return; }
+
+    try {
+        const res = await fetch('/save-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, mode: 'admin' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            STATE.userRole = 'admin';
+            tempUserData = { email: 'YETKILI@ADMIN', unit: data.unit, tc: data.unit };
+            setCurrentUserEmail('YETKILI@ADMIN');
+            showContract();
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) { showToast('Yetkili girişi başarısız!'); }
 }
 
 // Sistemi Başlat ve Arayüzü Yükle
@@ -170,8 +237,13 @@ function initSystem() {
     showToast(`Hoş geldiniz!`);
 }
 
-function logout() {
+async function logout() {
     if (confirm('Çıkış yapmak istiyor musunuz?')) {
+        try {
+            await fetch('/logout', { method: 'POST' });
+        } catch (e) {
+            console.log('Logout request failed');
+        }
         location.reload(); // En temiz çıkış yöntemi
     }
 }

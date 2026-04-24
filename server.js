@@ -3,17 +3,29 @@ const fs = require('fs');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const session = require('express-session');
 const app = express();
 
 // CORS Ayarı: Her yerden gelen isteğe izin ver (Android ve Web için şart)
 app.use(cors());
 app.use(express.json());
 
+// Session Ayarı
+app.use(session({
+    secret: 'tr-gozu-secret-key-2024',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: false, // Render'da HTTPS varsa true yap
+        maxAge: 24 * 60 * 60 * 1000 // 24 saat
+    }
+}));
+
 // Statik Dosyalar: index.html ana dizindeyse '.' kullanıyoruz
 app.use(express.static('.'));
 
-// PORT Ayarı: Render'daki ayarın 3000 ise bu kod ona uyar
-const PORT = process.env.PORT || 3000;
+// PORT Ayarı: Render'daki ayarın 10000 ise bu kod ona uyar
+const PORT = process.env.PORT || 10000;
 
 // Email Ayarı (Environment Variables kullanmanı öneririm)
 const transporter = nodemailer.createTransport({
@@ -61,10 +73,41 @@ const writeJSON = (file, data) => {
     }
 };
 
+// Session kontrol middleware'i
+function requireAuth(req, res, next) {
+    if (req.session.user) {
+        next();
+    } else {
+        res.status(401).json({ success: false, message: "Oturum açmanız gerekiyor!" });
+    }
+}
+
 // --- ROTALAR (ENDPOINTS) ---
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Session kontrolü
+app.get('/check-session', (req, res) => {
+    if (req.session.user) {
+        res.json({ 
+            loggedIn: true, 
+            user: req.session.user 
+        });
+    } else {
+        res.json({ loggedIn: false });
+    }
+});
+
+// Logout
+app.post('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: "Çıkış yapılamadı!" });
+        }
+        res.json({ success: true, message: "Çıkış başarılı." });
+    });
 });
 
 app.post('/save-user', (req, res) => {
@@ -88,7 +131,33 @@ app.post('/save-user', (req, res) => {
         if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı!" });
         if (!user.isVerified) return res.status(403).json({ success: false, message: "Email doğrulanmamış!" });
         if (user.pass !== pass) return res.status(401).json({ success: false, message: "Şifre yanlış!" });
+        
+        // Session'a kullanıcı bilgisini kaydet
+        req.session.user = {
+            email: user.email,
+            role: 'citizen',
+            loginTime: new Date().toISOString()
+        };
+        
         return res.json({ success: true, message: "Giriş başarılı." });
+    }
+
+    if (mode === 'admin') {
+        const { key } = req.body;
+        const adminKeys = JSON.parse(fs.readFileSync(path.join(__dirname, 'yetkili.json'), 'utf8'));
+        const unit = adminKeys[key];
+        if (unit) {
+            req.session.user = {
+                email: 'YETKILI@ADMIN',
+                role: 'admin',
+                unit: unit,
+                tc: unit,
+                loginTime: new Date().toISOString()
+            };
+            return res.json({ success: true, message: "Yetkili giriş başarılı.", unit });
+        } else {
+            return res.status(401).json({ success: false, message: "Hatalı Yetkili Anahtarı!" });
+        }
     }
 });
 
@@ -100,22 +169,28 @@ app.post('/api/forgot-password', (req, res) => {
     
     if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
     
-    const resetToken = Math.random().toString(36).slice(-12);
-    user.resetToken = resetToken;
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetToken = resetCode;
     user.resetExpires = Date.now() + 3600000; // 1 saat
     writeJSON(USERS_FILE, users);
     
-    const resetLink = `http://localhost:3000/reset-password.html?token=${resetToken}`;
-    sendEmail(email, 'Şifre Sıfırlama', `<p>Şifrenizi sıfırlamak için <a href="${resetLink}">buraya tıklayın</a>.</p><p>Link 1 saat geçerlidir.</p>`);
-    res.json({ success: true, message: "Şifre sıfırlama maili gönderildi!" });
+    const resetLinkHost = req.get('host') || `localhost:${PORT}`;
+    const resetLinkProtocol = req.protocol || 'http';
+    const resetLink = `${resetLinkProtocol}://${resetLinkHost}/reset-password.html?token=${resetCode}`;
+    sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer link kullanmak isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
+    res.json({ success: true, message: "Doğrulama kodu mailinize gönderildi!" });
 });
 
 app.post('/api/reset-password', (req, res) => {
-    const { token, newPassword } = req.body;
+    const { email, token, newPassword } = req.body;
+    if (!email || !token || !newPassword) {
+        return res.status(400).json({ success: false, message: "Email, kod ve yeni şifre gereklidir!" });
+    }
+
     let users = readJSON(USERS_FILE);
-    const user = users.find(u => u.resetToken === token && u.resetExpires > Date.now());
+    const user = users.find(u => u.email === email && u.resetToken === token && u.resetExpires > Date.now());
     
-    if (!user) return res.status(400).json({ success: false, message: "Geçersiz veya süresi dolmuş token!" });
+    if (!user) return res.status(400).json({ success: false, message: "Geçersiz kod veya süresi dolmuş!" });
     
     user.pass = newPassword;
     delete user.resetToken;
