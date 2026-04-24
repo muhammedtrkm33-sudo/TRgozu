@@ -4,11 +4,32 @@ const cors = require('cors');
 const nodemailer = require('nodemailer');
 const path = require('path');
 const session = require('express-session');
-const sqlite3 = require('sqlite3').verbose();
 const app = express();
 
 // Aktif vatandaşları takip etmek için global array
 let activeCitizens = [];
+
+// JSON dosya tabanlı depolama
+const USERS_FILE = path.join(__dirname, 'users.json');
+const MESSAGES_FILE = path.join(__dirname, 'messages.json');
+
+const readJSON = (file) => {
+    if (!fs.existsSync(file)) return [];
+    try {
+        return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch (e) {
+        console.error('Dosya okuma hatası:', e);
+        return [];
+    }
+};
+
+const writeJSON = (file, data) => {
+    try {
+        fs.writeFileSync(file, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('Dosya yazma hatası:', e);
+    }
+};
 
 // CORS Ayarı: Her yerden gelen isteğe izin ver (Android ve Web için şart)
 app.use(cors());
@@ -53,61 +74,6 @@ const sendEmail = async (to, subject, html) => {
         console.error('Email hatası:', error);
     }
 };
-
-// SQLite Database Bağlantısı
-const db = new sqlite3.Database('./trgozu.db', (err) => {
-    if (err) {
-        console.error('Database bağlantı hatası:', err.message);
-    } else {
-        console.log('SQLite veritabanına bağlandı.');
-    }
-});
-
-// Tabloları oluştur
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        pass TEXT NOT NULL,
-        created TEXT NOT NULL,
-        isVerified INTEGER DEFAULT 0,
-        verificationCode TEXT,
-        verificationExpires INTEGER,
-        resetToken TEXT,
-        resetExpires INTEGER
-    )`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sender TEXT NOT NULL,
-        receiver TEXT NOT NULL,
-        message TEXT NOT NULL,
-        timestamp TEXT NOT NULL,
-        type TEXT DEFAULT 'text'
-    )`);
-
-    // Eski users.json'dan migration (bir kez çalıştır)
-    const fs = require('fs');
-    const path = require('path');
-    const usersFile = path.join(__dirname, 'users.json');
-    if (fs.existsSync(usersFile)) {
-        try {
-            const oldUsers = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
-            oldUsers.forEach(user => {
-                db.run("INSERT OR IGNORE INTO users (email, pass, created, isVerified) VALUES (?, ?, ?, ?)", 
-                    [user.email, user.pass, user.created, user.isVerified ? 1 : 0], (err) => {
-                    if (err) console.log('Migration hatası:', err);
-                    else console.log(`Kullanıcı migrated: ${user.email}`);
-                });
-            });
-            // Eski dosyayı yedekle
-            fs.renameSync(usersFile, usersFile + '.backup');
-            console.log('users.json yedeklendi ve migration tamamlandı.');
-        } catch (e) {
-            console.log('Migration hatası:', e);
-        }
-    }
-});
 
 // Session kontrol middleware'i
 function requireAuth(req, res, next) {
@@ -160,64 +126,60 @@ app.post('/logout', (req, res) => {
 });
 
 app.post('/save-user', (req, res) => {
-    const { email, pass, mode } = req.body;
+    const { email, pass, mode, key } = req.body;
+    const users = readJSON(USERS_FILE);
+    const existingUser = users.find(u => u.email === email);
 
     if (mode === 'reg') {
-        // Email zaten kayıtlı mı kontrol et
-        db.get("SELECT email FROM users WHERE email = ?", [email], (err, row) => {
-            if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-            if (row) return res.status(400).json({ success: false, message: "Bu email zaten kayıtlı!" });
-            
-            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            const verificationExpires = Date.now() + 3600000; // 1 saat
-            
-            db.run("INSERT INTO users (email, pass, created, isVerified, verificationCode, verificationExpires) VALUES (?, ?, ?, 0, ?, ?)", 
-                [email, pass, new Date().toISOString(), verificationCode, verificationExpires], function(err) {
-                if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
-                
-                const host = req.get('host') || `localhost:${PORT}`;
-                const protocol = req.protocol || 'http';
-                const verifyLink = `${protocol}://${host}`;
-                sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
-                return res.json({ success: true, message: "Kayıt başarılı! Mailinize gönderilen kodla hesabınızı doğrulayın." });
-            });
+        if (existingUser) return res.status(400).json({ success: false, message: "Bu email zaten kayıtlı!" });
+
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const verificationExpires = Date.now() + 3600000; // 1 saat
+
+        users.push({
+            email,
+            pass,
+            created: new Date().toISOString(),
+            isVerified: false,
+            verificationCode,
+            verificationExpires
         });
+        writeJSON(USERS_FILE, users);
+
+        const host = req.get('host') || `localhost:${PORT}`;
+        const protocol = req.protocol || 'http';
+        const verifyLink = `${protocol}://${host}`;
+        sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+        return res.json({ success: true, message: "Kayıt başarılı! Mailinize gönderilen kodla hesabınızı doğrulayın." });
     }
 
     if (mode === 'login') {
-        db.get("SELECT * FROM users WHERE email = ?", [email], (err, user) => {
-            if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-            if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı!" });
-            if (!user.isVerified) return res.status(403).json({ success: false, message: "Email doğrulanmamış!" });
-            if (user.pass !== pass) return res.status(401).json({ success: false, message: "Şifre yanlış!" });
-            
-            // Session'a kullanıcı bilgisini kaydet
-            req.session.user = {
-                email: user.email,
-                role: 'citizen',
-                loginTime: new Date().toISOString()
-            };
-            
-            // Aktif vatandaşlar listesine ekle
-            const citizenInfo = {
-                email: user.email,
-                loginTime: new Date().toISOString(),
-                sessionId: req.sessionID
-            };
-            // Aynı email varsa güncelle, yoksa ekle
-            const existingIndex = activeCitizens.findIndex(c => c.email === user.email);
-            if (existingIndex >= 0) {
-                activeCitizens[existingIndex] = citizenInfo;
-            } else {
-                activeCitizens.push(citizenInfo);
-            }
-            
-            return res.json({ success: true, message: "Giriş başarılı." });
-        });
+        if (!existingUser) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı!" });
+        if (!existingUser.isVerified) return res.status(403).json({ success: false, message: "Email doğrulanmamış!" });
+        if (existingUser.pass !== pass) return res.status(401).json({ success: false, message: "Şifre yanlış!" });
+
+        req.session.user = {
+            email: existingUser.email,
+            role: 'citizen',
+            loginTime: new Date().toISOString()
+        };
+
+        const citizenInfo = {
+            email: existingUser.email,
+            loginTime: new Date().toISOString(),
+            sessionId: req.sessionID
+        };
+        const existingIndex = activeCitizens.findIndex(c => c.email === existingUser.email);
+        if (existingIndex >= 0) {
+            activeCitizens[existingIndex] = citizenInfo;
+        } else {
+            activeCitizens.push(citizenInfo);
+        }
+
+        return res.json({ success: true, message: "Giriş başarılı." });
     }
 
     if (mode === 'admin') {
-        const { key } = req.body;
         const adminKeys = JSON.parse(fs.readFileSync(path.join(__dirname, 'yetkili.json'), 'utf8'));
         const keyEntry = adminKeys.authorized_keys.find(item => item.key === key);
         const unit = keyEntry ? keyEntry.unit : null;
@@ -239,75 +201,64 @@ app.post('/save-user', (req, res) => {
 // Şifre Sıfırlama Rotaları
 app.post('/api/forgot-password', (req, res) => {
     const { email } = req.body;
+    const users = readJSON(USERS_FILE);
+    const user = users.find(u => u.email === email);
     
-    db.get("SELECT * FROM users WHERE email = ?", [email], (err, user) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
-        
-        const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-        const resetExpires = Date.now() + 3600000; // 1 saat
-        
-        db.run("UPDATE users SET resetToken = ?, resetExpires = ? WHERE email = ?", 
-            [resetCode, resetExpires, email], function(err) {
-            if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-            
-            const resetLinkHost = req.get('host') || `localhost:${PORT}`;
-            const resetLinkProtocol = req.protocol || 'http';
-            const resetLink = `${resetLinkProtocol}://${resetLinkHost}`;
-            sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
-            res.json({ success: true, message: "Doğrulama kodu mailinize gönderildi!" });
-        });
-    });
+    if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
+    
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetToken = resetCode;
+    user.resetExpires = Date.now() + 3600000; // 1 saat
+    writeJSON(USERS_FILE, users);
+    
+    const resetLinkHost = req.get('host') || `localhost:${PORT}`;
+    const resetLinkProtocol = req.protocol || 'http';
+    const resetLink = `${resetLinkProtocol}://${resetLinkHost}`;
+    sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
+    res.json({ success: true, message: "Doğrulama kodu mailinize gönderildi!" });
 });
 
 app.post('/api/verify-registration', (req, res) => {
     const { email, code } = req.body;
     if (!email || !code) return res.status(400).json({ success: false, message: "Email ve kod gereklidir!" });
 
-    db.get("SELECT * FROM users WHERE email = ? AND verificationCode = ? AND verificationExpires > ?", 
-        [email, code, Date.now()], (err, user) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!user) return res.status(400).json({ success: false, message: "Geçersiz kod veya süresi dolmuş!" });
+    const users = readJSON(USERS_FILE);
+    const user = users.find(u => u.email === email && u.verificationCode === code && u.verificationExpires > Date.now());
+    if (!user) return res.status(400).json({ success: false, message: "Geçersiz kod veya süresi dolmuş!" });
 
-        db.run("UPDATE users SET isVerified = 1, verificationCode = NULL, verificationExpires = NULL WHERE email = ?", 
-            [email], function(err) {
-            if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-            
-            // Doğrulama sonrası otomatik giriş için session oluştur
-            req.session.user = {
-                email: user.email,
-                role: 'citizen',
-                loginTime: new Date().toISOString()
-            };
-            
-            res.json({ success: true, message: "Hesabınız doğrulandı! Hoş geldiniz." });
-        });
-    });
+    user.isVerified = true;
+    delete user.verificationCode;
+    delete user.verificationExpires;
+    writeJSON(USERS_FILE, users);
+    
+    req.session.user = {
+        email: user.email,
+        role: 'citizen',
+        loginTime: new Date().toISOString()
+    };
+    
+    res.json({ success: true, message: "Hesabınız doğrulandı! Hoş geldiniz." });
 });
 
 app.post('/api/resend-verification-code', (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: "Email gereklidir!" });
 
-    db.get("SELECT * FROM users WHERE email = ?", [email], (err, user) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
-        if (user.isVerified) return res.status(400).json({ success: false, message: "Bu hesap zaten doğrulanmış." });
+    const users = readJSON(USERS_FILE);
+    const user = users.find(u => u.email === email);
+    if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
+    if (user.isVerified) return res.status(400).json({ success: false, message: "Bu hesap zaten doğrulanmış." });
 
-        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-        const verificationExpires = Date.now() + 3600000;
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verificationCode = verificationCode;
+    user.verificationExpires = Date.now() + 3600000;
+    writeJSON(USERS_FILE, users);
 
-        db.run("UPDATE users SET verificationCode = ?, verificationExpires = ? WHERE email = ?", 
-            [verificationCode, verificationExpires, email], function(err) {
-            if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-
-            const host = req.get('host') || `localhost:${PORT}`;
-            const protocol = req.protocol || 'http';
-            const verifyLink = `${protocol}://${host}`;
-            sendEmail(email, 'TR-GOZU Doğrulama Kodu Tekrar', `<p>Yeni doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
-            res.json({ success: true, message: "Yeni doğrulama kodu gönderildi!" });
-        });
-    });
+    const host = req.get('host') || `localhost:${PORT}`;
+    const protocol = req.protocol || 'http';
+    const verifyLink = `${protocol}://${host}`;
+    sendEmail(email, 'TR-GOZU Doğrulama Kodu Tekrar', `<p>Yeni doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+    res.json({ success: true, message: "Yeni doğrulama kodu gönderildi!" });
 });
 
 app.post('/api/reset-password', (req, res) => {
@@ -316,26 +267,21 @@ app.post('/api/reset-password', (req, res) => {
         return res.status(400).json({ success: false, message: "Email, kod ve yeni şifre gereklidir!" });
     }
 
-    db.get("SELECT * FROM users WHERE email = ? AND resetToken = ? AND resetExpires > ?", 
-        [email, token, Date.now()], (err, user) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!user) return res.status(400).json({ success: false, message: "Geçersiz kod veya süresi dolmuş!" });
-        
-        db.run("UPDATE users SET pass = ?, resetToken = NULL, resetExpires = NULL WHERE email = ?", 
-            [newPassword, email], function(err) {
-            if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-            res.json({ success: true, message: "Şifre başarıyla güncellendi!" });
-        });
-    });
+    const users = readJSON(USERS_FILE);
+    const user = users.find(u => u.email === email && u.resetToken === token && u.resetExpires > Date.now());
+    if (!user) return res.status(400).json({ success: false, message: "Geçersiz kod veya süresi dolmuş!" });
+    
+    user.pass = newPassword;
+    delete user.resetToken;
+    delete user.resetExpires;
+    writeJSON(USERS_FILE, users);
+    res.json({ success: true, message: "Şifre başarıyla güncellendi!" });
 });
 
 app.get('/api/messages/:userId', (req, res) => {
+    const msgs = readJSON(MESSAGES_FILE);
     const userId = decodeURIComponent(req.params.userId);
-    db.all("SELECT * FROM messages WHERE sender = ? OR receiver = ? OR receiver = 'ADMIN'", 
-        [userId, userId], (err, rows) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        res.json(rows);
-    });
+    res.json(msgs.filter(m => m.sender === userId || m.receiver === userId || m.receiver === 'ADMIN'));
 });
 
 // SUNUCUYU BAŞLAT
