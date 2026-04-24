@@ -185,6 +185,20 @@ app.post('/save-user', (req, res) => {
                 loginTime: new Date().toISOString()
             };
             
+            // Aktif vatandaşlar listesine ekle
+            const citizenInfo = {
+                email: user.email,
+                loginTime: new Date().toISOString(),
+                sessionId: req.sessionID
+            };
+            // Aynı email varsa güncelle, yoksa ekle
+            const existingIndex = activeCitizens.findIndex(c => c.email === user.email);
+            if (existingIndex >= 0) {
+                activeCitizens[existingIndex] = citizenInfo;
+            } else {
+                activeCitizens.push(citizenInfo);
+            }
+            
             return res.json({ success: true, message: "Giriş başarılı." });
         });
     }
