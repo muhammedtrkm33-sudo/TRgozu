@@ -17,6 +17,6 @@
     "express": "^5.2.1",
     "express-session": "^1.17.3",
     "nodemailer": "^6.9.7",
-    "sqlite3": "^5.1.6"
+    "sqlite3": "^5.0.0"
   }
 }
