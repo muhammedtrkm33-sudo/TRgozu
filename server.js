@@ -148,7 +148,8 @@ app.post('/save-user', (req, res) => {
     if (mode === 'admin') {
         const { key } = req.body;
         const adminKeys = JSON.parse(fs.readFileSync(path.join(__dirname, 'yetkili.json'), 'utf8'));
-        const unit = adminKeys[key];
+        const keyEntry = adminKeys.authorized_keys.find(item => item.key === key);
+        const unit = keyEntry ? keyEntry.unit : null;
         if (unit) {
             req.session.user = {
                 email: 'YETKILI@ADMIN',
