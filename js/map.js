@@ -994,3 +994,42 @@ function invalidateMapSize() {
 
 window.addEventListener('resize', debounce(invalidateMapSize, 250));
 window.addEventListener('orientationchange', () => setTimeout(invalidateMapSize, 300));
+
+// Aktif vatandaşları yetkililere göster
+async function loadActiveCitizens() {
+    try {
+        const response = await fetch('/api/active-citizens');
+        const data = await response.json();
+        
+        if (data.success) {
+            const listDiv = document.getElementById('activeCitizensList');
+            if (listDiv) {
+                listDiv.innerHTML = '';
+                
+                if (data.citizens.length === 0) {
+                    listDiv.innerHTML = '<div class="admin-card" style="text-align:center;color:var(--text-muted);">Aktif vatandaş bulunmuyor</div>';
+                    return;
+                }
+                
+                data.citizens.forEach(citizen => {
+                    const loginTime = new Date(citizen.loginTime);
+                    const timeSinceLogin = timeSince(citizen.loginTime);
+                    
+                    listDiv.innerHTML += `
+                        <div class="admin-card active-citizen-card">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <span style="font-size:12px;word-break:break-all;">${citizen.email}</span>
+                                <span class="text-success" style="font-size:10px;">AKTİF</span>
+                            </div>
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                                Giriş: ${timeSinceLogin}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Aktif vatandaşlar yüklenirken hata:', error);
+    }
+}
