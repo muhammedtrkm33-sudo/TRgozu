@@ -1,0 +1,9 @@
+[
+  {
+    "email": "test@gmail.com",
+    "pass": "1234",
+    "created": "2026-04-24T09:42:22.482Z",
+    "isVerified": true,
+    "verificationToken": "0.ou52omn91o"
+  }
+]
