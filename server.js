@@ -82,28 +82,27 @@ db.serialize(() => {
         timestamp TEXT NOT NULL,
         type TEXT DEFAULT 'text'
     )`);
-});
 
-// DOSYA YOLLARI: Render'da silinmemesi için garantili yol
-const USERS_FILE = path.join(__dirname, 'users.json');
-const MESSAGES_FILE = path.join(__dirname, 'messages.json');
-
-const readJSON = (file) => {
-    if (!fs.existsSync(file)) return [];
-    try {
-        const data = fs.readFileSync(file, 'utf8');
-        return JSON.parse(data);
-    } catch (e) {
-        console.error("Dosya okuma hatası:", e);
-        return [];
-    }
-};
-
-const writeJSON = (file, data) => {
-    try {
-        fs.writeFileSync(file, JSON.stringify(data, null, 2));
-    } catch (e) {
-        console.error("Dosya yazma hatası:", e);
+    // Eski users.json'dan migration (bir kez çalıştır)
+    const fs = require('fs');
+    const path = require('path');
+    const usersFile = path.join(__dirname, 'users.json');
+    if (fs.existsSync(usersFile)) {
+        try {
+            const oldUsers = JSON.parse(fs.readFileSync(usersFile, 'utf8'));
+            oldUsers.forEach(user => {
+                db.run("INSERT OR IGNORE INTO users (email, pass, created, isVerified) VALUES (?, ?, ?, ?)", 
+                    [user.email, user.pass, user.created, user.isVerified ? 1 : 0], (err) => {
+                    if (err) console.log('Migration hatası:', err);
+                    else console.log(`Kullanıcı migrated: ${user.email}`);
+                });
+            });
+            // Eski dosyayı yedekle
+            fs.renameSync(usersFile, usersFile + '.backup');
+            console.log('users.json yedeklendi ve migration tamamlandı.');
+        } catch (e) {
+            console.log('Migration hatası:', e);
+        }
     }
 });
 
@@ -299,13 +298,14 @@ app.post('/api/reset-password', (req, res) => {
         });
     });
 });
-});
 
 app.get('/api/messages/:userId', (req, res) => {
-    const msgs = readJSON(MESSAGES_FILE);
     const userId = decodeURIComponent(req.params.userId);
-    // Burada hem gelen hem giden mesajları eksiksiz döndürdüğünden emin ol
-    res.json(msgs.filter(m => m.from === userId || m.to === userId || m.to === 'ADMIN'));
+    db.all("SELECT * FROM messages WHERE sender = ? OR receiver = ? OR receiver = 'ADMIN'", 
+        [userId, userId], (err, rows) => {
+        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
+        res.json(rows);
+    });
 });
 
 // SUNUCUYU BAŞLAT
