@@ -205,3 +205,28 @@ function setCurrentUserEmail(email) {
     localStorage.setItem('currentUserEmail', email);
 }
 
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar && overlay) {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+}
+
+async function logout() {
+    if (confirm('Çıkış yapmak istiyor musunuz?')) {
+        try {
+            const res = await fetch('/logout', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Çıkış başarılı');
+            }
+        } catch (e) {
+            console.log('Logout request failed');
+        }
+        // Session temizlendikten sonra sayfayı yenile
+        setTimeout(() => location.reload(), 500);
+    }
+}
+
