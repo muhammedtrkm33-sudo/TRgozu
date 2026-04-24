@@ -118,13 +118,16 @@ app.post('/save-user', (req, res) => {
     if (mode === 'reg') {
         if (user) return res.status(400).json({ success: false, message: "Bu email zaten kayıtlı!" });
         
-        const verificationToken = Math.random().toString(36).slice(-12);
-        users.push({ email, pass, created: new Date().toISOString(), isVerified: false, verificationToken });
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const verificationExpires = Date.now() + 3600000; // 1 saat
+        users.push({ email, pass, created: new Date().toISOString(), isVerified: false, verificationCode, verificationExpires });
         writeJSON(USERS_FILE, users);
         
-        const verifyLink = `http://localhost:3000/verify-email.html?token=${verificationToken}`;
-        sendEmail(email, 'Email Doğrulama', `<p>Hesabınızı doğrulamak için <a href="${verifyLink}">buraya tıklayın</a>.</p><p>Doğrulama sonrası şifreniz: <b>${pass}</b></p>`);
-        return res.json({ success: true, message: "Kayıt başarılı! Emailinizi doğrulayın." });
+        const host = req.get('host') || `localhost:${PORT}`;
+        const protocol = req.protocol || 'http';
+        const verifyLink = `${protocol}://${host}`;
+        sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+        return res.json({ success: true, message: "Kayıt başarılı! Mailinize gönderilen kodla hesabınızı doğrulayın." });
     }
 
     if (mode === 'login') {
@@ -176,9 +179,45 @@ app.post('/api/forgot-password', (req, res) => {
     
     const resetLinkHost = req.get('host') || `localhost:${PORT}`;
     const resetLinkProtocol = req.protocol || 'http';
-    const resetLink = `${resetLinkProtocol}://${resetLinkHost}/reset-password.html?token=${resetCode}`;
-    sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer link kullanmak isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
+    const resetLink = `${resetLinkProtocol}://${resetLinkHost}`;
+    sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
     res.json({ success: true, message: "Doğrulama kodu mailinize gönderildi!" });
+});
+
+app.post('/api/verify-registration', (req, res) => {
+    const { email, code } = req.body;
+    if (!email || !code) return res.status(400).json({ success: false, message: "Email ve kod gereklidir!" });
+
+    let users = readJSON(USERS_FILE);
+    const user = users.find(u => u.email === email && u.verificationCode === code && u.verificationExpires > Date.now());
+    if (!user) return res.status(400).json({ success: false, message: "Geçersiz kod veya süresi dolmuş!" });
+
+    user.isVerified = true;
+    delete user.verificationCode;
+    delete user.verificationExpires;
+    writeJSON(USERS_FILE, users);
+    res.json({ success: true, message: "Hesabınız doğrulandı! Şimdi giriş yapabilirsiniz." });
+});
+
+app.post('/api/resend-verification-code', (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: "Email gereklidir!" });
+
+    let users = readJSON(USERS_FILE);
+    const user = users.find(u => u.email === email);
+    if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
+    if (user.isVerified) return res.status(400).json({ success: false, message: "Bu hesap zaten doğrulanmış." });
+
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verificationCode = verificationCode;
+    user.verificationExpires = Date.now() + 3600000;
+    writeJSON(USERS_FILE, users);
+
+    const host = req.get('host') || `localhost:${PORT}`;
+    const protocol = req.protocol || 'http';
+    const verifyLink = `${protocol}://${host}`;
+    sendEmail(email, 'TR-GOZU Doğrulama Kodu Tekrar', `<p>Yeni doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+    res.json({ success: true, message: "Yeni doğrulama kodu gönderildi!" });
 });
 
 app.post('/api/reset-password', (req, res) => {

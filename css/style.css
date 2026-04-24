@@ -167,11 +167,14 @@ body {
     margin-top: 20px;
 }
 
-.modal-buttons .btn { flex: 1; }
+..modal-buttons .btn { 
+    flex: 1;
+    min-height: 48px;
+}
 
 .modal-buttons .btn-secondary {
     background: #333333;
-    color: white;
+    color: #ffffff !important;
 }
 
 .modal-buttons .btn-secondary:hover {

@@ -87,7 +87,8 @@ async function valideKayit() {
             STATE.userRole = 'citizen';
             tempUserData = { email };
             setCurrentUserEmail(email);
-            showContract();
+            showToast(data.message);
+            showVerifyModal();
         } else {
             showToast(data.message);
         }
@@ -183,6 +184,65 @@ async function resetPasswordWithCode() {
         }
     } catch (e) {
         showToast('Şifre güncelleme başarısız oldu!');
+    }
+}
+
+function showVerifyModal() {
+    document.getElementById('verify_email').value = document.getElementById('c_user').value.trim().toLowerCase();
+    document.getElementById('verify_code').value = '';
+    document.getElementById('verifyStatus').textContent = 'Mailinize gönderilen doğrulama kodunu girin.';
+    document.getElementById('verifyModal').classList.remove('hidden');
+}
+
+function closeVerifyModal() {
+    document.getElementById('verifyModal').classList.add('hidden');
+}
+
+async function verifyRegistrationCode() {
+    const email = document.getElementById('verify_email').value.trim().toLowerCase();
+    const code = document.getElementById('verify_code').value.trim();
+
+    if (!email || !isValidEmail(email)) { showToast('Geçerli bir e-posta girin!'); return; }
+    if (!code) { showToast('Lütfen kodu girin!'); return; }
+
+    try {
+        const res = await fetch('/api/verify-registration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            closeVerifyModal();
+            showContract();
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) {
+        showToast('Doğrulama başarısız oldu!');
+    }
+}
+
+async function resendVerificationCode() {
+    const email = document.getElementById('verify_email').value.trim().toLowerCase();
+    if (!email || !isValidEmail(email)) { showToast('Geçerli bir e-posta girin!'); return; }
+
+    try {
+        const res = await fetch('/api/resend-verification-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            document.getElementById('verifyStatus').textContent = 'Yeni kod gönderildi. Mailinizi kontrol edin.';
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) {
+        showToast('Kod tekrar gönderilemedi!');
     }
 }
 
