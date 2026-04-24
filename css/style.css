@@ -1019,8 +1019,8 @@ select {
 
 .sos-cooldown-badge {
     position: fixed;
-    bottom: 125px;
-    right: 36px;
+    bottom: 30px;
+    left: 30px;
     min-width: 86px;
     padding: 10px 12px;
     border-radius: 18px;
