@@ -124,6 +124,14 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+app.get('/api/active-citizens', requireAuth, (req, res) => {
+    // Sadece yetkililer görebilir
+    if (req.session.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: "Yetkisiz erişim!" });
+    }
+    res.json({ success: true, citizens: activeCitizens });
+});
+
 // Session kontrolü
 app.get('/check-session', (req, res) => {
     if (req.session.user) {
@@ -138,6 +146,11 @@ app.get('/check-session', (req, res) => {
 
 // Logout
 app.post('/logout', (req, res) => {
+    // Aktif vatandaşlar listesinden çıkar
+    if (req.session.user && req.session.user.role === 'citizen') {
+        activeCitizens = activeCitizens.filter(c => c.email !== req.session.user.email);
+    }
+    
     req.session.destroy((err) => {
         if (err) {
             return res.status(500).json({ success: false, message: "Çıkış yapılamadı!" });
