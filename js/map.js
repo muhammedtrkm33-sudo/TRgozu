@@ -732,11 +732,13 @@ function clearEmergencyLayers() {
 function startAdminView() {
     loadCitizensOnMap();
     updatePriorityZones();
+    loadActiveCitizens();
 
     if (window.adminRefreshTimer) clearInterval(window.adminRefreshTimer);
     window.adminRefreshTimer = setInterval(() => {
         loadCitizensOnMap();
         updatePriorityZones();
+        loadActiveCitizens();
     }, CONFIG.ADMIN_REFRESH_INTERVAL);
 }
 
