@@ -96,7 +96,7 @@ async function valideKayit() {
             tempUserData = { email };
             setCurrentUserEmail(email);
             showToast(data.message);
-            showContract();
+            showVerifyModal();
         } else {
             showToast(data.message);
         }
