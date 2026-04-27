@@ -281,6 +281,15 @@ async function handleAdminGirisLocal() {
 
 // Sistemi Başlat ve Arayüzü Yükle
 function initSystem() {
+    // Her cihazda temiz başla - eski localStorage verilerini sıfırla
+    const keysToKeep = ['currentUserEmail', 'autoLogin'];
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach(key => {
+        if (!keysToKeep.includes(key)) {
+            localStorage.removeItem(key);
+        }
+    });
+
     const mainApp = document.getElementById('mainApp');
     const displayUser = document.getElementById('displayUser');
     const roleBadge = document.getElementById('roleBadge');
