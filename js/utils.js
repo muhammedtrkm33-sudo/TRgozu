@@ -71,10 +71,39 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, m => map[m]);
 }
 
+// Cloud storage - sunucudan veri yükle
+async function loadUserDataFromServer() {
+    const email = getCurrentUserEmail();
+    if (!email) return;
+    try {
+        const res = await fetch(`/api/load-user-data/${email}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+            // Sunucudan alınan verileri localStorage'a kaydet
+            Object.keys(data.data).forEach(key => {
+                localStorage.setItem(key, JSON.stringify(data.data[key]));
+            });
+            console.log('Kullanıcı verileri sunucudan yüklendi');
+        }
+    } catch (e) {
+        console.error('Server veri yükleme hatası:', e);
+    }
+}
+
 // Local Storage yardımcıları
 function saveToStorage(key, data) {
     try {
         localStorage.setItem(key, JSON.stringify(data));
+        
+        // Sunucuya da kaydet (arka planda)
+        const email = getCurrentUserEmail();
+        if (email && key !== 'currentUserEmail' && key !== 'autoLogin') {
+            fetch('/api/save-user-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, key, value: data })
+            }).catch(e => console.error('Server kayıt hatası:', e));
+        }
         return true;
     } catch (e) {
         console.error('Storage save error:', e);
