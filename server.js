@@ -328,7 +328,7 @@ app.post('/api/reset-password', (req, res) => {
 
 // Kullanıcı verilerini sunucudan yükle
 app.get('/api/load-user-data/:email', (req, res) => {
-    const { email } = req.params;
+    const email = decodeURIComponent(req.params.email);
     db.get(`SELECT * FROM user_data WHERE email = ?`, [email], (err, row) => {
         if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
         if (!row) {
