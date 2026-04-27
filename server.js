@@ -326,6 +326,87 @@ app.post('/api/reset-password', (req, res) => {
     });
 });
 
+// Kullanıcı verilerini sunucudan yükle
+app.get('/api/load-user-data/:email', (req, res) => {
+    const { email } = req.params;
+    db.get(`SELECT * FROM user_data WHERE email = ?`, [email], (err, row) => {
+        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
+        if (!row) {
+            // Yeni kullanıcı, boş data oluştur
+            db.run(`INSERT INTO user_data (email, family, announcements, missingPersons, helpRequests, citizens, sosList, threads, chatMessages, lastUpdated) 
+                    VALUES (?, '[]', '[]', '[]', '[]', '[]', '[]', '[]', '[]', ?)`,
+                [email, new Date().toISOString()]);
+            return res.json({ success: true, data: {} });
+        }
+        res.json({ 
+            success: true, 
+            data: {
+                family: row.family ? JSON.parse(row.family) : [],
+                announcements: row.announcements ? JSON.parse(row.announcements) : [],
+                missingPersons: row.missingPersons ? JSON.parse(row.missingPersons) : [],
+                helpRequests: row.helpRequests ? JSON.parse(row.helpRequests) : [],
+                citizens: row.citizens ? JSON.parse(row.citizens) : [],
+                sosList: row.sosList ? JSON.parse(row.sosList) : [],
+                threads: row.threads ? JSON.parse(row.threads) : [],
+                chatMessages: row.chatMessages ? JSON.parse(row.chatMessages) : []
+            }
+        });
+    });
+});
+
+// Kullanıcı verilerini sunucuya kaydet
+app.post('/api/save-user-data', (req, res) => {
+    const { email, key, value } = req.body;
+    if (!email || !key) return res.status(400).json({ success: false, message: "Email ve key gereklidir!" });
+
+    db.get(`SELECT * FROM user_data WHERE email = ?`, [email], (err, row) => {
+        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
+        
+        const data = row || {
+            email,
+            family: '[]',
+            announcements: '[]',
+            missingPersons: '[]',
+            helpRequests: '[]',
+            citizens: '[]',
+            sosList: '[]',
+            threads: '[]',
+            chatMessages: '[]'
+        };
+
+        // Güncellenecek alanı ayarla
+        if (key === 'family') data.family = JSON.stringify(value);
+        else if (key === 'announcements') data.announcements = JSON.stringify(value);
+        else if (key === 'missingPersons') data.missingPersons = JSON.stringify(value);
+        else if (key === 'helpRequests') data.helpRequests = JSON.stringify(value);
+        else if (key === 'citizens') data.citizens = JSON.stringify(value);
+        else if (key === 'sosList') data.sosList = JSON.stringify(value);
+        else if (key === 'threads') data.threads = JSON.stringify(value);
+        else if (key === 'chatMessages') data.chatMessages = JSON.stringify(value);
+
+        data.lastUpdated = new Date().toISOString();
+
+        if (row) {
+            db.run(`UPDATE user_data SET family=?, announcements=?, missingPersons=?, helpRequests=?, citizens=?, sosList=?, threads=?, chatMessages=?, lastUpdated=? WHERE email=?`,
+                [data.family, data.announcements, data.missingPersons, data.helpRequests, data.citizens, data.sosList, data.threads, data.chatMessages, data.lastUpdated, email],
+                function(err) {
+                    if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
+                    res.json({ success: true, message: "Veri kaydedildi." });
+                }
+            );
+        } else {
+            db.run(`INSERT INTO user_data (email, family, announcements, missingPersons, helpRequests, citizens, sosList, threads, chatMessages, lastUpdated) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [email, data.family, data.announcements, data.missingPersons, data.helpRequests, data.citizens, data.sosList, data.threads, data.chatMessages, data.lastUpdated],
+                function(err) {
+                    if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
+                    res.json({ success: true, message: "Veri kaydedildi." });
+                }
+            );
+        }
+    });
+});
+
 app.get('/api/messages/:userId', (req, res) => {
     const msgs = readJSON(MESSAGES_FILE);
     const userId = decodeURIComponent(req.params.userId);
