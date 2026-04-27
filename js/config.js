@@ -226,6 +226,8 @@ async function logout() {
         } catch (e) {
             console.log('Logout request failed');
         }
+        // Otomatik giriş verisini temizle
+        localStorage.removeItem('autoLogin');
         // Session temizlendikten sonra sayfayı yenile
         setTimeout(() => location.reload(), 500);
     }
