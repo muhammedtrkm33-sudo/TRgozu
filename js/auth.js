@@ -56,10 +56,7 @@ function showContract() { document.getElementById('contractModal').classList.rem
 function closeModal() { document.getElementById('contractModal').classList.add('hidden'); }
 
 function confirmContract() {
-    if (!document.getElementById('acceptCheck').checked) {
-        showToast('Devam etmek için kullanım koşullarını kabul etmelisiniz!');
-        return;
-    }
+    document.getElementById('acceptCheck').checked = true; // Otomatik kabul
     if (tempUserData) {
         closeModal();
         document.getElementById('authSection').classList.add('hidden');
@@ -88,7 +85,7 @@ async function valideKayit() {
             tempUserData = { email };
             setCurrentUserEmail(email);
             showToast(data.message);
-            showVerifyModal();
+            showContract();
         } else {
             showToast(data.message);
         }
@@ -312,8 +309,11 @@ async function logout() {
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         const authSection = document.getElementById('authSection');
+        const contractModal = document.getElementById('contractModal');
         if (!authSection.classList.contains('hidden')) {
             valideGiris();
+        } else if (!contractModal.classList.contains('hidden')) {
+            confirmContract();
         }
     }
 });
