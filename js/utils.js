@@ -76,7 +76,8 @@ async function loadUserDataFromServer() {
     const email = getCurrentUserEmail();
     if (!email) return;
     try {
-        const res = await fetch(`/api/load-user-data/${email}`);
+        const encodedEmail = encodeURIComponent(email);
+        const res = await fetch(`/api/load-user-data/${encodedEmail}`);
         const data = await res.json();
         if (data.success && data.data) {
             // Sunucudan alınan verileri localStorage'a kaydet
@@ -101,7 +102,11 @@ function saveToStorage(key, data) {
             fetch('/api/save-user-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, key, value: data })
+                body: JSON.stringify({ 
+                    email, 
+                    key, 
+                    value: data 
+                })
             }).catch(e => console.error('Server kayıt hatası:', e));
         }
         return true;
