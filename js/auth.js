@@ -308,7 +308,15 @@ function initSystem() {
         document.getElementById('adminPanel').classList.add('hidden');
         roleBadge.innerText = "VATANDAŞ";
         roleBadge.style.background = "var(--secondary)";
-        if (typeof loadFamilyMembers === 'function') loadFamilyMembers();
+        
+        // Sunucudan kullanıcı verilerini yükle
+        if (typeof loadUserDataFromServer === 'function') {
+            loadUserDataFromServer().then(() => {
+                if (typeof loadFamilyMembers === 'function') loadFamilyMembers();
+            });
+        } else {
+            if (typeof loadFamilyMembers === 'function') loadFamilyMembers();
+        }
     }
     
     setTimeout(() => { if (window.map) window.map.invalidateSize(); }, 500);
