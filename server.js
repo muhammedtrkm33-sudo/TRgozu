@@ -166,11 +166,14 @@ app.post('/save-user', (req, res) => {
                 [email, pass, new Date().toISOString(), verificationCode, verificationExpires], function(err) {
                 if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
 
+                // Otomatik doğrulama
+                db.run(`UPDATE users SET isVerified = 1, verificationCode = NULL, verificationExpires = NULL WHERE email = ?`, [email]);
+
                 const host = req.get('host') || `localhost:${PORT}`;
                 const protocol = req.protocol || 'http';
                 const verifyLink = `${protocol}://${host}`;
-                sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
-                return res.json({ success: true, message: "Kayıt başarılı! Mailinize gönderilen kodla hesabınızı doğrulayın." });
+                sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', `<p>Hesabınız otomatik olarak doğrulandı. Giriş yapabilirsiniz.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+                return res.json({ success: true, message: "Kayıt başarılı! Hesabınız otomatik olarak doğrulandı." });
             });
         });
         return;
