@@ -37,6 +37,19 @@ db.serialize(() => {
         message TEXT,
         timestamp TEXT
     )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS user_data (
+        email TEXT PRIMARY KEY,
+        family TEXT,
+        announcements TEXT,
+        missingPersons TEXT,
+        helpRequests TEXT,
+        citizens TEXT,
+        sosList TEXT,
+        threads TEXT,
+        chatMessages TEXT,
+        lastUpdated TEXT
+    )`);
 });
 
 const readJSON = (file) => {
