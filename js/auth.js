@@ -9,6 +9,17 @@ const ADMIN_KEYS = {
 
 let tempUserData = null;
 
+// Otomatik giriş
+document.addEventListener('DOMContentLoaded', () => {
+    const autoLoginData = localStorage.getItem('autoLogin');
+    if (autoLoginData) {
+        const { email, pass } = JSON.parse(autoLoginData);
+        document.getElementById('c_user').value = email;
+        document.getElementById('c_pass').value = pass;
+        valideGiris();
+    }
+});
+
 // Sayfa yüklendiğinde session kontrolü
 async function initAuth() {
     try {
@@ -110,6 +121,7 @@ async function valideGiris() {
             STATE.userRole = 'citizen';
             tempUserData = { email };
             setCurrentUserEmail(email);
+            localStorage.setItem('autoLogin', JSON.stringify({ email, pass })); // Otomatik giriş için kaydet
             showContract();
         } else {
             showToast(data.message);
