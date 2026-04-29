@@ -28,6 +28,8 @@ async function initAuth() {
         if (data.loggedIn) {
             // Session var, direkt ana uygulamaya geç
             STATE.userRole = data.user.role;
+            STATE.isVerified = data.isVerified;
+            STATE.securityLevel = data.securityLevel;
             tempUserData = data.user;
             setCurrentUserEmail(data.user.email);
             document.getElementById('authSection').classList.add('hidden');
@@ -119,9 +121,17 @@ async function valideGiris() {
         const data = await res.json();
         if (data.success) {
             STATE.userRole = 'citizen';
-            tempUserData = { email };
+            STATE.isVerified = data.isVerified;
+            STATE.securityLevel = data.securityLevel;
+            tempUserData = { email, isVerified: data.isVerified, securityLevel: data.securityLevel };
             setCurrentUserEmail(email);
             localStorage.setItem('autoLogin', JSON.stringify({ email, pass })); // Otomatik giriş için kaydet
+            
+            // Güvenlik uyarısı göster
+            if (!data.isVerified) {
+                showToast('⚠️ ' + data.securityMessage + ' - SOS atış ve editör güvenliği sınırlıdır!', 'warning');
+            }
+            
             showContract();
         } else {
             showToast(data.message);
@@ -222,6 +232,8 @@ async function verifyRegistrationCode() {
         });
         const data = await res.json();
         if (data.success) {
+            STATE.isVerified = true;
+            STATE.securityLevel = 'Yüksek';
             showToast(data.message);
             closeVerifyModal();
             showContract();
