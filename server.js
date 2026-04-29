@@ -202,6 +202,10 @@ app.get('/check-session', (req, res) => {
             user: req.session.user,
             isVerified: req.session.user.isVerified,
             securityLevel: req.session.user.securityLevel || 'Düşük'
+        });
+    }
+    return res.json({ loggedIn: false });
+});
 
 // Logout
 app.post('/logout', (req, res) => {
