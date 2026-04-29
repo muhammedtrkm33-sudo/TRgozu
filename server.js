@@ -199,12 +199,9 @@ app.get('/check-session', (req, res) => {
     if (req.session.user) {
         return res.json({ 
             loggedIn: true, 
-            user: req.session.user 
-        });
-    } else {
-        return res.json({ loggedIn: false });
-    }
-});
+            user: req.session.user,
+            isVerified: req.session.user.isVerified,
+            securityLevel: req.session.user.securityLevel || 'Düşük'
 
 // Logout
 app.post('/logout', (req, res) => {
@@ -261,17 +258,24 @@ app.post('/save-user', (req, res) => {
         db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
             if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
             if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı!" });
-            if (!user.isVerified) return res.status(403).json({ success: false, message: "Email doğrulanmamış!" });
             if (user.pass !== pass) return res.status(401).json({ success: false, message: "Şifre yanlış!" });
+
+            // Güvenlik seviyesini belirle
+            const securityLevel = user.isVerified ? 'Yüksek' : 'Düşük';
+            const securityMessage = user.isVerified ? 'Email doğrulandı' : 'Bu hesap doğrulanmadı - Güvenlik Düşük';
 
             req.session.user = {
                 email: user.email,
                 role: 'citizen',
+                isVerified: user.isVerified,
+                securityLevel: securityLevel,
                 loginTime: new Date().toISOString()
             };
 
             const citizenInfo = {
                 email: user.email,
+                isVerified: user.isVerified,
+                securityLevel: securityLevel,
                 loginTime: new Date().toISOString(),
                 sessionId: req.sessionID
             };
@@ -282,7 +286,13 @@ app.post('/save-user', (req, res) => {
                 activeCitizens.push(citizenInfo);
             }
 
-            return res.json({ success: true, message: "Giriş başarılı." });
+            return res.json({ 
+                success: true, 
+                message: "Giriş başarılı.", 
+                isVerified: user.isVerified,
+                securityLevel: securityLevel,
+                securityMessage: securityMessage
+            });
         });
         return;
     }
@@ -347,10 +357,17 @@ app.post('/api/verify-registration', (req, res) => {
             req.session.user = {
                 email: user.email,
                 role: 'citizen',
+                isVerified: true,
+                securityLevel: 'Yüksek',
                 loginTime: new Date().toISOString()
             };
             
-            res.json({ success: true, message: "Hesabınız doğrulandı! Hoş geldiniz." });
+            return res.json({ 
+                success: true, 
+                message: "Hesabınız doğrulandı! Hoş geldiniz.",
+                isVerified: true,
+                securityLevel: 'Yüksek'
+            });
         });
     });
 });
