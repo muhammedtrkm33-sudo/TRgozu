@@ -225,6 +225,10 @@ app.post('/save-user', (req, res) => {
     const { email, pass, mode, key } = req.body;
 
     if (mode === 'reg') {
+        if (!email || !pass) {
+            return res.status(400).json({ success: false, message: "Email ve şifre gereklidir!" });
+        }
+
         db.get(`SELECT email FROM users WHERE email = ?`, [email], (err, row) => {
             if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
             if (row) return res.status(400).json({ success: false, message: "Bu email zaten kayıtlı!" });
@@ -250,6 +254,10 @@ app.post('/save-user', (req, res) => {
     }
 
     if (mode === 'login') {
+        if (!email || !pass) {
+            return res.status(400).json({ success: false, message: "Email ve şifre gereklidir!" });
+        }
+
         db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
             if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
             if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı!" });
