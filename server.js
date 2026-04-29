@@ -123,10 +123,11 @@ const emailPass = process.env.EMAIL_PASS;
 const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
 const emailPort = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587;
 const emailSecure = process.env.EMAIL_SECURE === 'true';
-const emailConfigured = Boolean(emailUser && emailPass);
+const emailCredentialsArePlaceholder = (emailUser && emailUser.includes('your-email')) || (emailPass && emailPass.includes('your-app-password'));
+const emailConfigured = Boolean(emailUser && emailPass && !emailCredentialsArePlaceholder);
 
 if (!emailConfigured) {
-    console.error('!!! UYARI: EMAIL_USER ve EMAIL_PASS environment değişkenleri ayarlanmamış. Mail gönderimi çalışmaz. Lütfen .env veya gerçek environment değişkeni ekleyin.');
+    console.error('!!! UYARI: EMAIL_USER ve EMAIL_PASS environment değişkenleri doğru ayarlanmamış. .env dosyanızı kontrol edin. Gmail kullanıyorsanız gerçek Gmail adresinizi ve Google App Password (2FA etkin) kullanın.');
 }
 
 const transporter = emailConfigured ? nodemailer.createTransport({
