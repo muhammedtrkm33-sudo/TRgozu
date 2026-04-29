@@ -7,6 +7,24 @@ const session = require('express-session');
 const sqlite3 = require('sqlite3').verbose();
 const app = express();
 
+// .env desteği: proje kökünde bir .env varsa okuyup process.env'e aktar
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split(/\r?\n/).forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) return;
+        const idx = trimmed.indexOf('=');
+        if (idx > 0) {
+            const key = trimmed.slice(0, idx).trim();
+            const value = trimmed.slice(idx + 1).trim();
+            if (!(key in process.env)) {
+                process.env[key] = value;
+            }
+        }
+    });
+}
+
 // Aktif vatandaşları takip etmek için global array
 let activeCitizens = [];
 
