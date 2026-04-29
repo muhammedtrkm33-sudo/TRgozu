@@ -147,6 +147,11 @@ async function forceSendSOS() {
         sosCountdownTimer = null;
     }
 
+    // Doğrulanmamış kullanıcı uyarısı
+    if (!STATE.isVerified) {
+        showToast('⚠️ Bu hesap doğrulanmadığı için güvenlik riski vardır. Email doğrulamasını tamamlamanız önerilir.', 5000);
+    }
+
     const modal = document.getElementById('sosModal');
     const statusEl = document.getElementById('sosStatus');
 
@@ -202,7 +207,8 @@ async function forceSendSOS() {
 
     addSOS(email, lat, lng, wasPanic, {
         forwardToAuthority,
-        kandilliCheck: kCheck
+        kandilliCheck: kCheck,
+        senderVerified: STATE.isVerified
     });
 
     if (statusEl) {
