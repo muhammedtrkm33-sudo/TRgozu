@@ -132,6 +132,8 @@ const STATE = {
     userRole: null,
     tempUserData: null,
     userEmail: null,
+    isVerified: false,
+    securityLevel: 'Düşük',
     currentLocation: null,
     isLocationActive: false,
     sosCount: 0,
