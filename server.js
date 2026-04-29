@@ -74,6 +74,15 @@ const writeJSON = (file, data) => {
 app.use(cors());
 app.use(express.json());
 
+// JSON parse hatalarını sessizce handle et
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        console.warn('Geçersiz JSON request', req.method, req.path);
+        return res.status(400).json({ success: false, message: 'Geçersiz JSON' });
+    }
+    next();
+});
+
 // Session Ayarı
 app.use(session({
     secret: 'tr-gozu-secret-key-2024',
