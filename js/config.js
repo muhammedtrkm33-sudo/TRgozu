@@ -206,6 +206,22 @@ function getCurrentUserEmail() {
 function setCurrentUserEmail(email) {
     STATE.userEmail = email;
     localStorage.setItem('currentUserEmail', email);
+    
+    // Sidebarı güncelle
+    const displayUser = document.getElementById('displayUser');
+    const roleBadge = document.getElementById('roleBadge');
+    const securityBadge = document.getElementById('securityBadge');
+    
+    if (displayUser) {
+        displayUser.textContent = email.split('@')[0] || 'Kullanıcı';
+    }
+    if (roleBadge) {
+        roleBadge.textContent = STATE.userRole === 'admin' ? 'YETKİLİ' : 'VATANDAŞ';
+    }
+    if (securityBadge) {
+        securityBadge.textContent = `Güvenlik: ${STATE.securityLevel}`;
+        securityBadge.className = 'badge ' + (STATE.isVerified ? 'security-high' : 'security-low');
+    }
 }
 
 function toggleSidebar() {
