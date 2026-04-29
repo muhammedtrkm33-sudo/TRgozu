@@ -120,14 +120,19 @@ const PORT = process.env.PORT || 10000;
 
 const emailUser = process.env.EMAIL_USER;
 const emailPass = process.env.EMAIL_PASS;
+const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
+const emailPort = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587;
+const emailSecure = process.env.EMAIL_SECURE === 'true';
 const emailConfigured = Boolean(emailUser && emailPass);
 
 if (!emailConfigured) {
-    console.error('!!! UYARI: EMAIL_USER ve EMAIL_PASS environment değişkenleri ayarlanmamış. Mail gönderimi çalışmaz.');
+    console.error('!!! UYARI: EMAIL_USER ve EMAIL_PASS environment değişkenleri ayarlanmamış. Mail gönderimi çalışmaz. Lütfen .env veya gerçek environment değişkeni ekleyin.');
 }
 
 const transporter = emailConfigured ? nodemailer.createTransport({
-    service: 'gmail',
+    host: emailHost,
+    port: emailPort,
+    secure: emailSecure,
     auth: {
         user: emailUser,
         pass: emailPass
