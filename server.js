@@ -100,26 +100,51 @@ app.use(express.static('.'));
 // PORT Ayarı: Render'daki ayarın 10000 ise bu kod ona uyar
 const PORT = process.env.PORT || 10000;
 
-// Email Ayarı (Environment Variables kullanmanı öneririm)
-const transporter = nodemailer.createTransport({
+const emailUser = process.env.EMAIL_USER;
+const emailPass = process.env.EMAIL_PASS;
+const emailConfigured = Boolean(emailUser && emailPass);
+
+if (!emailConfigured) {
+    console.error('!!! UYARI: EMAIL_USER ve EMAIL_PASS environment değişkenleri ayarlanmamış. Mail gönderimi çalışmaz.');
+}
+
+const transporter = emailConfigured ? nodemailer.createTransport({
     service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER || 'trgozu@gmail.com',
-        pass: process.env.EMAIL_PASS || 'czclgweldsrwlsnx' 
+        user: emailUser,
+        pass: emailPass
     }
-});
+}) : null;
+
+if (transporter) {
+    transporter.verify((error, success) => {
+        if (error) {
+            console.error('Email bağlantı hatası:', error);
+        } else {
+            console.log('Email sunucusu bağlantısı başarılı');
+        }
+    });
+}
 
 const sendEmail = async (to, subject, html) => {
+    if (!transporter) {
+        const errorMessage = 'Email yapılandırması eksik. EMAIL_USER ve EMAIL_PASS ayarlayın.';
+        console.error(errorMessage);
+        return { success: false, error: errorMessage };
+    }
+
     try {
-        await transporter.sendMail({
-            from: process.env.EMAIL_USER || 'trgozu@gmail.com',
+        const info = await transporter.sendMail({
+            from: emailUser,
             to,
             subject,
             html
         });
-        console.log(`Email gönderildi: ${to}`);
+        console.log(`Email gönderildi: ${to}`, info.messageId);
+        return { success: true, info };
     } catch (error) {
         console.error('Email hatası:', error);
+        return { success: false, error: error.message || error };
     }
 };
 
@@ -185,13 +210,16 @@ app.post('/save-user', (req, res) => {
             const verificationExpires = Date.now() + 3600000; // 1 saat
 
             db.run(`INSERT INTO users (email, pass, created, isVerified, verificationCode, verificationExpires) VALUES (?, ?, ?, 0, ?, ?)`,
-                [email, pass, new Date().toISOString(), verificationCode, verificationExpires], function(err) {
+                [email, pass, new Date().toISOString(), verificationCode, verificationExpires], async function(err) {
                 if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
 
                 const host = req.get('host') || `localhost:${PORT}`;
                 const protocol = req.protocol || 'http';
                 const verifyLink = `${protocol}://${host}`;
-                sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+                const emailResult = await sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+                if (!emailResult.success) {
+                    return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
+                }
                 return res.json({ success: true, message: "Kayıt başarılı! Mailinize gönderilen kodla hesabınızı doğrulayın." });
             });
         });
@@ -257,13 +285,16 @@ app.post('/api/forgot-password', (req, res) => {
         
         const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
         db.run(`UPDATE users SET resetToken = ?, resetExpires = ? WHERE email = ?`,
-            [resetCode, Date.now() + 3600000, email], function(err) {
+            [resetCode, Date.now() + 3600000, email], async function(err) {
             if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
             
             const resetLinkHost = req.get('host') || `localhost:${PORT}`;
             const resetLinkProtocol = req.protocol || 'http';
             const resetLink = `${resetLinkProtocol}://${resetLinkHost}`;
-            sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
+            const emailResult = await sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
+            if (!emailResult.success) {
+                return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
+            }
             res.json({ success: true, message: "Doğrulama kodu mailinize gönderildi!" });
         });
     });
@@ -304,13 +335,16 @@ app.post('/api/resend-verification-code', (req, res) => {
 
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
         db.run(`UPDATE users SET verificationCode = ?, verificationExpires = ? WHERE email = ?`,
-            [verificationCode, Date.now() + 3600000, email], function(err) {
+            [verificationCode, Date.now() + 3600000, email], async function(err) {
             if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
 
             const host = req.get('host') || `localhost:${PORT}`;
             const protocol = req.protocol || 'http';
             const verifyLink = `${protocol}://${host}`;
-            sendEmail(email, 'TR-GOZU Doğrulama Kodu Tekrar', `<p>Yeni doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+            const emailResult = await sendEmail(email, 'TR-GOZU Doğrulama Kodu Tekrar', `<p>Yeni doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
+            if (!emailResult.success) {
+                return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
+            }
             res.json({ success: true, message: "Yeni doğrulama kodu gönderildi!" });
         });
     });
