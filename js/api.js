@@ -1064,7 +1064,7 @@ function addSOS(email, lat, lng, isPanic = false, meta = {}) {
         lat,
         lng,
         isPanic,
-        isVerified: false,
+        senderVerified: meta.senderVerified || false,
         time: new Date().toISOString(),
         forwardToAuthority,
         kandilliCheck: meta.kandilliCheck || null
