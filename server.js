@@ -176,7 +176,7 @@ function requireAuth(req, res, next) {
     if (req.session.user) {
         next();
     } else {
-        res.status(401).json({ success: false, message: "Oturum açmanız gerekiyor!" });
+        return res.status(401).json({ success: false, message: "Oturum açmanız gerekiyor!" });
     }
 }
 
@@ -191,18 +191,18 @@ app.get('/api/active-citizens', requireAuth, (req, res) => {
     if (req.session.user.role !== 'admin') {
         return res.status(403).json({ success: false, message: "Yetkisiz erişim!" });
     }
-    res.json({ success: true, citizens: activeCitizens });
+    return res.json({ success: true, citizens: activeCitizens });
 });
 
 // Session kontrolü
 app.get('/check-session', (req, res) => {
     if (req.session.user) {
-        res.json({ 
+        return res.json({ 
             loggedIn: true, 
             user: req.session.user 
         });
     } else {
-        res.json({ loggedIn: false });
+        return res.json({ loggedIn: false });
     }
 });
 
@@ -217,7 +217,7 @@ app.post('/logout', (req, res) => {
         if (err) {
             return res.status(500).json({ success: false, message: "Çıkış yapılamadı!" });
         }
-        res.json({ success: true, message: "Çıkış başarılı." });
+        return res.json({ success: true, message: "Çıkış başarılı." });
     });
 });
 
@@ -326,7 +326,7 @@ app.post('/api/forgot-password', (req, res) => {
             if (!emailResult.success) {
                 return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
             }
-            res.json({ success: true, message: "Doğrulama kodu mailinize gönderildi!" });
+            return res.json({ success: true, message: "Doğrulama kodu mailinize gönderildi!" });
         });
     });
 });
@@ -376,7 +376,7 @@ app.post('/api/resend-verification-code', (req, res) => {
             if (!emailResult.success) {
                 return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
             }
-            res.json({ success: true, message: "Yeni doğrulama kodu gönderildi!" });
+            return res.json({ success: true, message: "Yeni doğrulama kodu gönderildi!" });
         });
     });
 });
