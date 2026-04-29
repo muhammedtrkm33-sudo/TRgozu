@@ -637,6 +637,20 @@ select {
     letter-spacing: 0.5px;
 }
 
+.badge.security-low {
+    background: #ef4444;
+    color: #fff;
+    display: block;
+    margin-top: 8px;
+}
+
+.badge.security-high {
+    background: #22c55e;
+    color: #fff;
+    display: block;
+    margin-top: 8px;
+}
+
 .battery-info {
     display: flex;
     align-items: center;
