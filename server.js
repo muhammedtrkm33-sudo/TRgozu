@@ -151,7 +151,7 @@ if (transporter) {
 
 const sendEmail = async (to, subject, html) => {
     if (!transporter) {
-        const errorMessage = 'Email yapılandırması eksik. EMAIL_USER ve EMAIL_PASS ayarlayın.';
+        const errorMessage = 'Email yapılandırması eksik. EMAIL_USER ve EMAIL_PASS environment değişkenlerini veya .env dosyasını ayarlayın.';
         console.error(errorMessage);
         return { success: false, error: errorMessage };
     }
