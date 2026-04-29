@@ -136,7 +136,12 @@ const transporter = emailConfigured ? nodemailer.createTransport({
     secure: emailSecure,
     auth: {
         user: emailUser,
-        pass: emailPass
+        pass: emailPass,
+        method: 'LOGIN'
+    },
+    requireTLS: true,
+    tls: {
+        rejectUnauthorized: false
     }
 }) : null;
 
@@ -144,6 +149,9 @@ if (transporter) {
     transporter.verify((error, success) => {
         if (error) {
             console.error('Email bağlantı hatası:', error);
+            if (error.responseCode === 535) {
+                console.error('Gmail hata kodu 535: Kullanıcı adı veya şifre hatalı. App Password kullandığınızdan emin olun. 2FA açık olmalıdır.');
+            }
         } else {
             console.log('Email sunucusu bağlantısı başarılı');
         }
