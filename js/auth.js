@@ -9,16 +9,16 @@ const ADMIN_KEYS = {
 
 let tempUserData = null;
 
-// Otomatik giriş
-document.addEventListener('DOMContentLoaded', () => {
-    const autoLoginData = localStorage.getItem('autoLogin');
-    if (autoLoginData) {
-        const { email, pass } = JSON.parse(autoLoginData);
-        document.getElementById('c_user').value = email;
-        document.getElementById('c_pass').value = pass;
-        valideGiris();
-    }
-});
+// Otomatik giriş devre dışı bırakıldı - Her açılışta manuel giriş gerekli
+// document.addEventListener('DOMContentLoaded', () => {
+//     const autoLoginData = localStorage.getItem('autoLogin');
+//     if (autoLoginData) {
+//         const { email, pass } = JSON.parse(autoLoginData);
+//         document.getElementById('c_user').value = email;
+//         document.getElementById('c_pass').value = pass;
+//         valideGiris();
+//     }
+// });
 
 // Sayfa yüklendiğinde session kontrolü
 async function initAuth() {
@@ -125,7 +125,8 @@ async function valideGiris() {
             STATE.securityLevel = data.securityLevel;
             tempUserData = { email, isVerified: data.isVerified, securityLevel: data.securityLevel };
             setCurrentUserEmail(email);
-            localStorage.setItem('autoLogin', JSON.stringify({ email, pass })); // Otomatik giriş için kaydet
+            // Otomatik giriş devre dışı - localStorage'a kaydetme
+            // localStorage.setItem('autoLogin', JSON.stringify({ email, pass }));
             
             // Güvenlik uyarısı göster
             if (!data.isVerified) {
@@ -339,6 +340,8 @@ async function logout() {
     if (confirm('Çıkış yapmak istiyor musunuz?')) {
         try {
             await fetch('/logout', { method: 'POST' });
+            // Otomatik giriş verilerini temizle
+            localStorage.removeItem('autoLogin');
         } catch (e) {
             console.log('Logout request failed');
         }
