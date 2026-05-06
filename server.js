@@ -118,16 +118,16 @@ app.use(express.static('.'));
 // PORT Ayarı: Render'daki ayarın 10000 ise bu kod ona uyar
 const PORT = process.env.PORT || 10000;
 
-const emailUser = process.env.EMAIL_USER;
-const emailPass = process.env.EMAIL_PASS;
-const emailHost = process.env.EMAIL_HOST || 'smtp.gmail.com';
-const emailPort = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587;
-const emailSecure = process.env.EMAIL_SECURE === 'true';
-const emailCredentialsArePlaceholder = (emailUser && emailUser.includes('your-email')) || (emailPass && emailPass.includes('your-app-password'));
+const emailUser = process.env.EMAIL_USER || process.env.EMAIL_USERNAME || process.env.SMTP_USER || process.env.SMTP_USERNAME;
+const emailPass = process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+const emailHost = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
+const emailPort = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : (process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587);
+const emailSecure = (process.env.EMAIL_SECURE || process.env.SMTP_SECURE) === 'true';
+const emailCredentialsArePlaceholder = (emailUser && /your[-_]?email/i.test(emailUser)) || (emailPass && /app[-_]?password/i.test(emailPass));
 const emailConfigured = Boolean(emailUser && emailPass && !emailCredentialsArePlaceholder);
 
 if (!emailConfigured) {
-    console.error('!!! UYARI: EMAIL_USER ve EMAIL_PASS environment değişkenleri doğru ayarlanmamış. .env dosyanızı kontrol edin. Gmail kullanıyorsanız gerçek Gmail adresinizi ve Google App Password (2FA etkin) kullanın.');
+    console.error('!!! UYARI: EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS environment değişkenleri doğru ayarlanmamış. .env veya Render environment değişkenlerinizi kontrol edin. Gmail için gerçek Gmail adresiniz ve Google App Password kullanın.');
 }
 
 const transporter = emailConfigured ? nodemailer.createTransport({
@@ -136,19 +136,13 @@ const transporter = emailConfigured ? nodemailer.createTransport({
     secure: emailSecure,
     auth: {
         user: emailUser,
-        pass: emailPass,
-        method: 'LOGIN'
+        pass: emailPass
     },
     requireTLS: !emailSecure,
     tls: {
         rejectUnauthorized: false,
         minVersion: 'TLSv1.2'
-    },
-    connectionUrl: null,
-    maxConnections: 5,
-    maxMessages: 100,
-    rateDelta: 1000,
-    rateLimit: 5
+    }
 }) : null;
 
 if (transporter) {
@@ -166,14 +160,14 @@ if (transporter) {
 
 const sendEmail = async (to, subject, html) => {
     if (!transporter) {
-        const errorMessage = 'Email yapılandırması eksik. EMAIL_USER ve EMAIL_PASS environment değişkenlerini veya .env dosyasını ayarlayın.';
+        const errorMessage = 'Email yapılandırması eksik. EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS environment değişkenlerini ayarlayın.';
         console.error(errorMessage);
         return { success: false, error: errorMessage };
     }
 
     try {
         const info = await transporter.sendMail({
-            from: emailUser,
+            from: process.env.EMAIL_FROM || emailUser,
             to,
             subject,
             html
@@ -250,7 +244,7 @@ app.post('/save-user', (req, res) => {
                 if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
 
                 const host = req.get('host') || `localhost:${PORT}`;
-                const protocol = req.protocol || 'http';
+                const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
                 const verifyLink = `${protocol}://${host}`;
                 const emailResult = await sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
                 if (!emailResult.success) {
