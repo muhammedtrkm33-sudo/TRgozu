@@ -118,19 +118,19 @@ app.use(express.static('.'));
 // PORT Ayarı: Render'daki ayarın 10000 ise bu kod ona uyar
 const PORT = process.env.PORT || 10000;
 
-const emailUser = process.env.EMAIL_USER || process.env.EMAIL_USERNAME || process.env.SMTP_USER || process.env.SMTP_USERNAME;
-const emailPass = process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD || process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
-const emailHost = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
-const emailPort = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : (process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587);
-const emailSecure = (process.env.EMAIL_SECURE || process.env.SMTP_SECURE) === 'true';
-const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_FROM || (emailUser ? `TR-GOZU <${emailUser}>` : undefined);
+const emailUser = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SMTP_USERNAME || process.env.EMAIL_USERNAME;
+const emailPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASSWORD;
+const emailHost = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
+const emailPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : (process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587);
+const emailSecure = (process.env.SMTP_SECURE || process.env.EMAIL_SECURE) === 'true';
+const emailFrom = process.env.SMTP_FROM || process.env.EMAIL_FROM || (emailUser ? `TR-GOZU <${emailUser}>` : undefined);
 const emailCredentialsArePlaceholder = (emailUser && /your[-_]?email/i.test(emailUser)) || (emailPass && /app[-_]?password/i.test(emailPass));
 const emailConfigured = Boolean(emailUser && emailPass && !emailCredentialsArePlaceholder);
 
 if (!emailConfigured) {
-    console.error('!!! UYARI: EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS environment değişkenleri doğru ayarlanmamış. .env veya Render ortam değişkenlerinizi kontrol edin.');
+    console.error('!!! UYARI: SMTP_USER / SMTP_PASS veya EMAIL_USER / EMAIL_PASS environment değişkenleri eksik veya hatalı. Render ortamınızı kontrol edin.');
 } else {
-    console.log(`Email yapılandırması kullanılıyor: ${emailUser} @ ${emailHost}:${emailPort} secure=${emailSecure}`);
+    console.log(`Email yapılandırması kullanılıyor: ${emailUser} @ ${emailHost}:${emailPort} secure=${emailSecure} from=${emailFrom}`);
 }
 
 const transporter = emailConfigured ? nodemailer.createTransport({
@@ -153,7 +153,7 @@ if (transporter) {
         if (error) {
             console.error('Email bağlantı hatası:', error);
             if (error.responseCode === 535) {
-                console.error('SMTP kullanıcı adı veya şifre hatalı. Sağlayıcınızın doğru bilgilerini kullanın.');
+                console.error('SMTP kullanıcı adı veya şifre hatalı. Lütfen SMTP_USER/SMTP_PASS bilgilerinizi kontrol edin.');
             }
         } else {
             console.log('Email sunucusu bağlantısı başarılı');
@@ -163,7 +163,7 @@ if (transporter) {
 
 const sendEmail = async (to, subject, html) => {
     if (!transporter) {
-        const errorMessage = 'Email yapılandırması eksik. EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS ortam değişkenlerini ayarlayın.';
+        const errorMessage = 'Email yapılandırması eksik. SMTP_USER / SMTP_PASS veya EMAIL_USER / EMAIL_PASS ortam değişkenlerini ayarlayın.';
         console.error(errorMessage);
         return { success: false, error: errorMessage };
     }
