@@ -139,10 +139,16 @@ const transporter = emailConfigured ? nodemailer.createTransport({
         pass: emailPass,
         method: 'LOGIN'
     },
-    requireTLS: true,
+    requireTLS: !emailSecure,
     tls: {
-        rejectUnauthorized: false
-    }
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+    },
+    connectionUrl: null,
+    maxConnections: 5,
+    maxMessages: 100,
+    rateDelta: 1000,
+    rateLimit: 5
 }) : null;
 
 if (transporter) {
@@ -203,16 +209,9 @@ app.get('/api/active-citizens', requireAuth, (req, res) => {
     return res.json({ success: true, citizens: activeCitizens });
 });
 
-// Session kontrolü
+// Session kontrolü - Otomatik girişi devre dışı bırak
 app.get('/check-session', (req, res) => {
-    if (req.session.user) {
-        return res.json({ 
-            loggedIn: true, 
-            user: req.session.user,
-            isVerified: req.session.user.isVerified,
-            securityLevel: req.session.user.securityLevel || 'Düşük'
-        });
-    }
+    // Her zaman loggedIn: false döndür - Kullanıcı her açılışta manuel giriş yapsın
     return res.json({ loggedIn: false });
 });
 
