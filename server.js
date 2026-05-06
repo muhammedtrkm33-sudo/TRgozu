@@ -168,10 +168,12 @@ const sendEmail = async (to, subject, html) => {
     }
 
     try {
+        const fromAddress = process.env.EMAIL_FROM || process.env.SMTP_FROM || `TR-GOZU <${emailUser}>`;
+        const replyToAddress = process.env.EMAIL_FROM || process.env.SMTP_FROM || emailUser;
         const info = await transporter.sendMail({
-            from: process.env.EMAIL_FROM || `TR-GOZU <${emailUser}>`,
+            from: fromAddress,
             to,
-            replyTo: process.env.EMAIL_FROM || emailUser,
+            replyTo: replyToAddress,
             subject,
             html
         });
