@@ -21,14 +21,15 @@
 5. Verilen 16 karakterlik şifreyi kopyalayın
 
 ### Adım 3: .env Dosyasını Güncelleyin
-`.env` dosyasını açın ve şu bilgileri girin:
+`.env` dosyasını açın ve şu bilgileri girin. Render ortam değişkenlerinde ise aynı bilgileri `SMTP_*` değişkenleri ile tanımlayın.
 
 ```
-EMAIL_USER=sizin-email@gmail.com
-EMAIL_PASS=16karakterlikSifre
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_SECURE=false
+SMTP_USER=sizin-email@gmail.com
+SMTP_PASS=16karakterlikSifre
+SMTP_FROM="TR-GOZU <sizin-email@gmail.com>"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
 PORT=10000
 ```
 
