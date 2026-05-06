@@ -123,11 +123,12 @@ const emailPass = process.env.EMAIL_PASS || process.env.EMAIL_PASSWORD || proces
 const emailHost = process.env.EMAIL_HOST || process.env.SMTP_HOST || 'smtp.gmail.com';
 const emailPort = process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : (process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 587);
 const emailSecure = (process.env.EMAIL_SECURE || process.env.SMTP_SECURE) === 'true';
+const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_FROM || (emailUser ? `TR-GOZU <${emailUser}>` : undefined);
 const emailCredentialsArePlaceholder = (emailUser && /your[-_]?email/i.test(emailUser)) || (emailPass && /app[-_]?password/i.test(emailPass));
 const emailConfigured = Boolean(emailUser && emailPass && !emailCredentialsArePlaceholder);
 
 if (!emailConfigured) {
-    console.error('!!! UYARI: EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS environment değişkenleri doğru ayarlanmamış. .env veya Render environment değişkenlerinizi kontrol edin. Gmail için gerçek Gmail adresiniz ve Google App Password kullanın.');
+    console.error('!!! UYARI: EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS environment değişkenleri doğru ayarlanmamış. .env veya Render ortam değişkenlerinizi kontrol edin.');
 } else {
     console.log(`Email yapılandırması kullanılıyor: ${emailUser} @ ${emailHost}:${emailPort} secure=${emailSecure}`);
 }
@@ -152,7 +153,7 @@ if (transporter) {
         if (error) {
             console.error('Email bağlantı hatası:', error);
             if (error.responseCode === 535) {
-                console.error('Gmail hata kodu 535: Kullanıcı adı veya şifre hatalı. App Password kullandığınızdan emin olun. 2FA açık olmalıdır.');
+                console.error('SMTP kullanıcı adı veya şifre hatalı. Sağlayıcınızın doğru bilgilerini kullanın.');
             }
         } else {
             console.log('Email sunucusu bağlantısı başarılı');
@@ -162,18 +163,16 @@ if (transporter) {
 
 const sendEmail = async (to, subject, html) => {
     if (!transporter) {
-        const errorMessage = 'Email yapılandırması eksik. EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS environment değişkenlerini ayarlayın.';
+        const errorMessage = 'Email yapılandırması eksik. EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS ortam değişkenlerini ayarlayın.';
         console.error(errorMessage);
         return { success: false, error: errorMessage };
     }
 
     try {
-        const fromAddress = process.env.EMAIL_FROM || process.env.SMTP_FROM || `TR-GOZU <${emailUser}>`;
-        const replyToAddress = process.env.EMAIL_FROM || process.env.SMTP_FROM || emailUser;
         const info = await transporter.sendMail({
-            from: fromAddress,
+            from: emailFrom,
             to,
-            replyTo: replyToAddress,
+            replyTo: emailFrom,
             subject,
             html
         });
