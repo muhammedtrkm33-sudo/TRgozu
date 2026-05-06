@@ -336,7 +336,7 @@ app.post('/api/forgot-password', (req, res) => {
             if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
             
             const resetLinkHost = req.get('host') || `localhost:${PORT}`;
-            const resetLinkProtocol = req.protocol || 'http';
+            const resetLinkProtocol = req.get('x-forwarded-proto') || req.protocol || 'http';
             const resetLink = `${resetLinkProtocol}://${resetLinkHost}`;
             const emailResult = await sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
             if (!emailResult.success) {
