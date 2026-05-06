@@ -128,6 +128,8 @@ const emailConfigured = Boolean(emailUser && emailPass && !emailCredentialsArePl
 
 if (!emailConfigured) {
     console.error('!!! UYARI: EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS environment değişkenleri doğru ayarlanmamış. .env veya Render environment değişkenlerinizi kontrol edin. Gmail için gerçek Gmail adresiniz ve Google App Password kullanın.');
+} else {
+    console.log(`Email yapılandırması kullanılıyor: ${emailUser} @ ${emailHost}:${emailPort} secure=${emailSecure}`);
 }
 
 const transporter = emailConfigured ? nodemailer.createTransport({
@@ -167,8 +169,9 @@ const sendEmail = async (to, subject, html) => {
 
     try {
         const info = await transporter.sendMail({
-            from: process.env.EMAIL_FROM || emailUser,
+            from: process.env.EMAIL_FROM || `TR-GOZU <${emailUser}>`,
             to,
+            replyTo: process.env.EMAIL_FROM || emailUser,
             subject,
             html
         });
@@ -325,20 +328,28 @@ app.post('/save-user', (req, res) => {
 // Şifre Sıfırlama Rotaları
 app.post('/api/forgot-password', (req, res) => {
     const { email } = req.body;
-    
-    db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
+    const normalizedEmail = email ? email.trim().toLowerCase() : '';
+
+    if (!normalizedEmail) {
+        return res.status(400).json({ success: false, message: "Email gereklidir!" });
+    }
+    if (!emailConfigured) {
+        return res.status(500).json({ success: false, message: "Email yapılandırması eksik. Lütfen EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS ortam değişkenlerini kontrol edin." });
+    }
+
+    db.get(`SELECT * FROM users WHERE email = ?`, [normalizedEmail], (err, user) => {
         if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
         if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
         
         const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
         db.run(`UPDATE users SET resetToken = ?, resetExpires = ? WHERE email = ?`,
-            [resetCode, Date.now() + 3600000, email], async function(err) {
+            [resetCode, Date.now() + 3600000, normalizedEmail], async function(err) {
             if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
             
             const resetLinkHost = req.get('host') || `localhost:${PORT}`;
             const resetLinkProtocol = req.get('x-forwarded-proto') || req.protocol || 'http';
             const resetLink = `${resetLinkProtocol}://${resetLinkHost}`;
-            const emailResult = await sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
+            const emailResult = await sendEmail(normalizedEmail, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
             if (!emailResult.success) {
                 return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
             }
