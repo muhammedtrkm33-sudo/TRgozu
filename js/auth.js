@@ -83,7 +83,6 @@ async function valideKayit() {
     const pass = document.getElementById('c_pass').value;
 
     if (!email || !isValidEmail(email)) { showToast('Geçerli bir e-posta adresi girin!'); return; }
-    if (!email.endsWith("@gmail.com")) { showToast('Sadece @gmail.com kabul edilir!'); return; }
     if (pass.length < 4) { showToast('Şifre en az 4 karakter olmalıdır!'); return; }
 
     try {
