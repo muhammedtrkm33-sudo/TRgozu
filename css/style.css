@@ -297,7 +297,7 @@ input, textarea, select {
     padding: 14px;
     border-radius: var(--radius);
     border: 2px solid #c20000;
-    background: #ff0000;
+    background: #ffcaca;
     color: #333333;
     font-size: 0.875rem;
     outline: none;
