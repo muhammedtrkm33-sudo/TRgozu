@@ -85,9 +85,6 @@ function triggerSOS() {
     }
     lastSosTime = now;
 
-    // SOS cooldown başlat
-    startSOSCooldown();
-
     // SOS modalini göster
     modal.classList.remove('hidden');
     document.getElementById('sosCountdown').textContent = CONFIG.SOS_COUNTDOWN;
@@ -129,6 +126,8 @@ function cancelSOS() {
         clearInterval(sosCountdownTimer);
         sosCountdownTimer = null;
     }
+
+    stopSOSCooldown();
 
     const modal = document.getElementById('sosModal');
     if (modal) modal.classList.add('hidden');
@@ -210,6 +209,8 @@ async function forceSendSOS() {
         kandilliCheck: kCheck,
         senderVerified: STATE.isVerified
     });
+
+    startSOSCooldown();
 
     if (statusEl) {
         if (forwardToAuthority) {
