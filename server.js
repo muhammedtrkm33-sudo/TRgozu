@@ -184,20 +184,6 @@ const sendEmail = async (to, subject, html) => {
     }
 };
 
-function normalizeEmail(value) {
-    return value ? value.trim().toLowerCase() : '';
-}
-
-function getAppBaseUrl(req) {
-    const host = req.get('host') || `localhost:${PORT}`;
-    const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-    return `${protocol}://${host}`;
-}
-
-function buildVerificationEmailHtml(code, baseUrl, title = 'Hesabınızı doğrulamak için doğrulama kodunuz') {
-    return `<p>${title}: <b>${code}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${baseUrl}">buraya tıklayın</a>.</p>`;
-}
-
 // Session kontrol middleware'i
 function requireAuth(req, res, next) {
     if (req.session.user) {
@@ -246,13 +232,11 @@ app.post('/save-user', (req, res) => {
     const { email, pass, mode, key } = req.body;
 
     if (mode === 'reg') {
-        const normalizedEmail = normalizeEmail(email);
-
-        if (!normalizedEmail || !pass) {
+        if (!email || !pass) {
             return res.status(400).json({ success: false, message: "Email ve şifre gereklidir!" });
         }
 
-        db.get(`SELECT * FROM users WHERE email = ?`, [normalizedEmail], (err, row) => {
+        db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, row) => {
             if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
             if (row && row.isVerified) {
                 return res.status(400).json({ success: false, message: "Bu email zaten kayıtlı!" });
@@ -260,14 +244,17 @@ app.post('/save-user', (req, res) => {
 
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
             const verificationExpires = Date.now() + 3600000; // 1 saat
-            const emailHtml = buildVerificationEmailHtml(verificationCode, getAppBaseUrl(req));
+            const host = req.get('host') || `localhost:${PORT}`;
+            const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+            const verifyLink = `${protocol}://${host}`;
+            const emailHtml = `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`;
 
             if (row) {
                 db.run(`UPDATE users SET pass = ?, verificationCode = ?, verificationExpires = ? WHERE email = ?`,
-                    [pass, verificationCode, verificationExpires, normalizedEmail], async function(err) {
+                    [pass, verificationCode, verificationExpires, email], async function(err) {
                     if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
 
-                    const emailResult = await sendEmail(normalizedEmail, 'TR-GOZU Kayıt Doğrulama Kodu', emailHtml);
+                    const emailResult = await sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', emailHtml);
                     if (!emailResult.success) {
                         return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
                     }
@@ -277,10 +264,10 @@ app.post('/save-user', (req, res) => {
             }
 
             db.run(`INSERT INTO users (email, pass, created, isVerified, verificationCode, verificationExpires) VALUES (?, ?, ?, 0, ?, ?)`,
-                [normalizedEmail, pass, new Date().toISOString(), verificationCode, verificationExpires], async function(err) {
+                [email, pass, new Date().toISOString(), verificationCode, verificationExpires], async function(err) {
                 if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
 
-                const emailResult = await sendEmail(normalizedEmail, 'TR-GOZU Kayıt Doğrulama Kodu', emailHtml);
+                const emailResult = await sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', emailHtml);
                 if (!emailResult.success) {
                     return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
                 }
@@ -291,43 +278,14 @@ app.post('/save-user', (req, res) => {
     }
 
     if (mode === 'login') {
-        const normalizedEmail = normalizeEmail(email);
-
-        if (!normalizedEmail || !pass) {
+        if (!email || !pass) {
             return res.status(400).json({ success: false, message: "Email ve şifre gereklidir!" });
         }
 
-        db.get(`SELECT * FROM users WHERE email = ?`, [normalizedEmail], (err, user) => {
+        db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
             if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
             if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı!" });
             if (user.pass !== pass) return res.status(401).json({ success: false, message: "Şifre yanlış!" });
-
-            if (!user.isVerified) {
-                const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-                const verificationExpires = Date.now() + 3600000;
-                const emailHtml = buildVerificationEmailHtml(verificationCode, getAppBaseUrl(req), 'Hesabınızı doğrulamak için yeni kodunuz');
-
-                db.run(`UPDATE users SET verificationCode = ?, verificationExpires = ? WHERE email = ?`,
-                    [verificationCode, verificationExpires, normalizedEmail], async function(updateErr) {
-                    if (updateErr) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-
-                    const emailResult = await sendEmail(normalizedEmail, 'TR-GOZU Giriş Doğrulama Kodu', emailHtml);
-                    if (!emailResult.success) {
-                        return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
-                    }
-
-                    return res.json({
-                        success: true,
-                        message: "Hesabınız doğrulanmamış. Doğrulama kodu e-postanıza gönderildi.",
-                        isVerified: false,
-                        securityLevel: 'Düşük',
-                        securityMessage: 'Bu hesap doğrulanmadı - Güvenlik Düşük',
-                        needsVerification: true,
-                        verificationSent: true
-                    });
-                });
-                return;
-            }
 
             // Güvenlik seviyesini belirle
             const securityLevel = user.isVerified ? 'Yüksek' : 'Düşük';
@@ -388,7 +346,7 @@ app.post('/save-user', (req, res) => {
 // Şifre Sıfırlama Rotaları
 app.post('/api/forgot-password', (req, res) => {
     const { email } = req.body;
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedEmail = email ? email.trim().toLowerCase() : '';
 
     if (!normalizedEmail) {
         return res.status(400).json({ success: false, message: "Email gereklidir!" });
@@ -420,7 +378,7 @@ app.post('/api/forgot-password', (req, res) => {
 
 app.post('/api/verify-registration', (req, res) => {
     const { email, code } = req.body;
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedEmail = email ? email.trim().toLowerCase() : '';
     if (!normalizedEmail || !code) return res.status(400).json({ success: false, message: "Email ve kod gereklidir!" });
 
     db.get(`SELECT * FROM users WHERE email = ? AND verificationCode = ? AND verificationExpires > ?`, 
@@ -452,7 +410,7 @@ app.post('/api/verify-registration', (req, res) => {
 
 app.post('/api/resend-verification-code', (req, res) => {
     const { email } = req.body;
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedEmail = email ? email.trim().toLowerCase() : '';
     if (!normalizedEmail) return res.status(400).json({ success: false, message: "Email gereklidir!" });
 
     db.get(`SELECT * FROM users WHERE email = ?`, [normalizedEmail], (err, user) => {
@@ -465,7 +423,10 @@ app.post('/api/resend-verification-code', (req, res) => {
             [verificationCode, Date.now() + 3600000, normalizedEmail], async function(err) {
             if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
 
-            const emailResult = await sendEmail(normalizedEmail, 'TR-GOZU Doğrulama Kodu Tekrar', buildVerificationEmailHtml(verificationCode, getAppBaseUrl(req), 'Yeni doğrulama kodunuz'));
+            const host = req.get('host') || `localhost:${PORT}`;
+            const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+            const verifyLink = `${protocol}://${host}`;
+            const emailResult = await sendEmail(normalizedEmail, 'TR-GOZU Doğrulama Kodu Tekrar', `<p>Yeni doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
             if (!emailResult.success) {
                 return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
             }
@@ -476,7 +437,7 @@ app.post('/api/resend-verification-code', (req, res) => {
 
 app.post('/api/reset-password', (req, res) => {
     const { email, token, newPassword } = req.body;
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedEmail = email ? email.trim().toLowerCase() : '';
     if (!normalizedEmail || !token || !newPassword) {
         return res.status(400).json({ success: false, message: "Email, kod ve yeni şifre gereklidir!" });
     }
