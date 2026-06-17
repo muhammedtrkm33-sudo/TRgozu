@@ -126,12 +126,13 @@ async function valideGiris() {
             setCurrentUserEmail(email);
             // Otomatik giriş devre dışı - localStorage'a kaydetme
             // localStorage.setItem('autoLogin', JSON.stringify({ email, pass }));
-            
-            // Güvenlik uyarısı göster
+
             if (!data.isVerified) {
-                showToast('⚠️ ' + data.securityMessage + ' - SOS atış ve editör güvenliği sınırlıdır!', 'warning');
+                showToast(data.message || data.securityMessage || 'Hesabınız doğrulanmadı.', 'warning');
+                showVerifyModal(data.message || 'Hesabınız doğrulanmamış. Mailinize gönderilen kodu girin.');
+                return;
             }
-            
+
             showContract();
         } else {
             showToast(data.message);
@@ -206,10 +207,10 @@ async function resetPasswordWithCode() {
     }
 }
 
-function showVerifyModal() {
+function showVerifyModal(message = 'Mailinize gönderilen doğrulama kodunu girin.') {
     document.getElementById('verify_email').value = document.getElementById('c_user').value.trim().toLowerCase();
     document.getElementById('verify_code').value = '';
-    document.getElementById('verifyStatus').textContent = 'Mailinize gönderilen doğrulama kodunu girin.';
+    document.getElementById('verifyStatus').textContent = message;
     document.getElementById('verifyModal').classList.remove('hidden');
 }
 
@@ -234,6 +235,11 @@ async function verifyRegistrationCode() {
         if (data.success) {
             STATE.isVerified = true;
             STATE.securityLevel = 'Yüksek';
+            if (tempUserData) {
+                tempUserData.isVerified = true;
+                tempUserData.securityLevel = 'Yüksek';
+            }
+            setCurrentUserEmail(email);
             showToast(data.message);
             closeVerifyModal();
             showContract();
