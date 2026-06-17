@@ -1,5 +1,20 @@
 # Email Gönderme Konfigürasyonu - Setup Rehberi
 
+## Render İçin Hızlı Kurulum
+
+Render kullanıyorsanız, uygulama koduna gizli bilgi eklemeden şu ortam değişkenlerini tanımlayın:
+
+```
+SMTP_USER=mail_kutunuz@alanadiniz.com
+SMTP_PASS=uygulama_sifreniz_buraya
+SMTP_FROM="TR-GOZU <mail_kutunuz@alanadiniz.com>"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+```
+
+Bu proje hem `SMTP_*` hem de `EMAIL_*` değişkenlerini destekler. Render panelinde bunları ekledikten sonra uygulamayı yeniden başlatmanız yeterlidir. `SMTP_USER` ile `SMTP_FROM` aynı posta kutusunu işaret etmelidir; sadece görünen ad kısmını değiştirebilirsiniz.
+
 ## Düzeltilen Hatalar ✅
 1. **Response gönderme hataları** - `return` ifadeleri eksikti (6 yer)
 2. **Email konfigürasyonu dokümantasyonu** - `.env` dosyası daha açık hale getirildi
