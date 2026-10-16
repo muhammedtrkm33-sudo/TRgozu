@@ -1,12 +1,49 @@
-// TR-GOZU Kimlik Doğrulama Modülü
+// TR-GOZU Kimlik Doğrulama Modülü (Tam Sürüm)
 
 let tempUserData = null;
 
+<<<<<<< HEAD
 for (let index = localStorage.length - 1; index >= 0; index -= 1) {
     const key = localStorage.key(index);
     if (key && key.startsWith('user_')) localStorage.removeItem(key);
 }
 
+=======
+// Otomatik giriş devre dışı bırakıldı - Her açılışta manuel giriş gerekli
+// document.addEventListener('DOMContentLoaded', () => {
+//     const autoLoginData = localStorage.getItem('autoLogin');
+//     if (autoLoginData) {
+//         const { email, pass } = JSON.parse(autoLoginData);
+//         document.getElementById('c_user').value = email;
+//         document.getElementById('c_pass').value = pass;
+//         valideGiris();
+//     }
+// });
+
+// Sayfa yüklendiğinde session kontrolü
+async function initAuth() {
+    try {
+        const res = await fetch('/check-session');
+        const data = await res.json();
+        if (data.loggedIn) {
+            // Session var, direkt ana uygulamaya geç
+            STATE.userRole = data.user.role;
+            STATE.isVerified = data.isVerified;
+            STATE.securityLevel = data.securityLevel;
+            tempUserData = data.user;
+            setCurrentUserEmail(data.user.email);
+            document.getElementById('authSection').classList.add('hidden');
+            initSystem();
+        }
+    } catch (e) {
+        console.log('Session kontrolü başarısız, giriş ekranı gösteriliyor');
+    }
+}
+
+// Sayfa yüklendiğinde çalıştır
+document.addEventListener('DOMContentLoaded', initAuth);
+
+>>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
 // Giriş türünü değiştir
 function switchAuth(type) {
     document.getElementById('citizenForm').classList.toggle('hidden', type !== 'citizen');
@@ -19,7 +56,6 @@ function switchAuth(type) {
 function togglePassVisibility() {
     const passInput = document.getElementById('c_pass');
     const toggleIcon = document.getElementById('toggleTC');
-
     if (passInput.type === "password") {
         passInput.type = "text";
         toggleIcon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
@@ -29,83 +65,266 @@ function togglePassVisibility() {
     }
 }
 
-// Kullanım koşulları modalını göster
-function showContract() {
-    document.getElementById('contractModal').classList.remove('hidden');
-}
+// Kullanım koşulları modalını yönet
+function showContract() { document.getElementById('contractModal').classList.remove('hidden'); }
+function closeModal() { document.getElementById('contractModal').classList.add('hidden'); }
 
-// Modalı kapat
-function closeModal() {
-    document.getElementById('contractModal').classList.add('hidden');
-    if (!STATE.userRole) tempUserData = null;
-}
-
-// Sözleşmeyi onayla ve devam et
 function confirmContract() {
-    if (!document.getElementById('acceptCheck').checked) {
-        showToast('Devam etmek için kullanım koşullarını kabul etmelisiniz!');
+    document.getElementById('acceptCheck').checked = true; // Otomatik kabul
+    if (tempUserData) {
+        closeModal();
+        document.getElementById('authSection').classList.add('hidden');
+        initSystem();
+    }
+}
+
+// --- KAYIT OL (Sunucu Odaklı) ---
+async function valideKayit() {
+    const email = document.getElementById('c_user').value.trim().toLowerCase();
+    const pass = document.getElementById('c_pass').value;
+
+    if (!email || !isValidEmail(email)) { showToast('Geçerli bir e-posta adresi girin!'); return; }
+    if (pass.length < 4) { showToast('Şifre en az 4 karakter olmalıdır!'); return; }
+
+    try {
+        const res = await fetch('/save-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, pass, mode: 'reg' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            STATE.userRole = 'citizen';
+            tempUserData = { email };
+            setCurrentUserEmail(email);
+            showToast(data.message);
+            showVerifyModal();
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) { showToast('Sunucu bağlantı hatası!'); }
+}
+
+// --- GİRİŞ YAP (Sunucu Odaklı) ---
+async function valideGiris() {
+    const email = document.getElementById('c_user').value.trim().toLowerCase();
+    const pass = document.getElementById('c_pass').value;
+
+    if (!email || !pass) { showToast('E-posta ve şifre gerekli!'); return; }
+
+    try {
+        const res = await fetch('/save-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, pass, mode: 'login' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            STATE.userRole = 'citizen';
+            STATE.isVerified = data.isVerified;
+            STATE.securityLevel = data.securityLevel;
+            tempUserData = { email, isVerified: data.isVerified, securityLevel: data.securityLevel };
+            setCurrentUserEmail(email);
+            // Otomatik giriş devre dışı - localStorage'a kaydetme
+            // localStorage.setItem('autoLogin', JSON.stringify({ email, pass }));
+
+            showContract();
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) { showToast('Giriş başarısız, sunucuya ulaşılamıyor!'); }
+}
+
+let forgotEmailSent = false;
+
+function forgotPassword() {
+    document.getElementById('forgot_email').value = document.getElementById('c_user').value.trim().toLowerCase();
+    document.getElementById('forgot_code').value = '';
+    document.getElementById('forgot_new_pass').value = '';
+    document.getElementById('forgotStatus').textContent = 'Kayıtlı e-posta adresinizi girin. Doğrulama kodu gönderilecektir.';
+    document.getElementById('forgotModal').classList.remove('hidden');
+}
+
+function closeForgotModal() {
+    document.getElementById('forgotModal').classList.add('hidden');
+}
+
+async function sendForgotCode() {
+    const email = document.getElementById('forgot_email').value.trim().toLowerCase();
+    if (!email || !isValidEmail(email)) {
+        showToast('Lütfen geçerli bir e-posta girin!');
         return;
     }
 
-    if (tempUserData) {
-        document.getElementById('contractModal').classList.add('hidden');
-        document.getElementById('authSection').classList.add('hidden');
-        initSystem();
-    } else {
-        showToast('Lütfen giriş yapın veya kayıt olun.');
-        closeModal();
+    try {
+        const res = await fetch('/api/forgot-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (data.success) {
+            forgotEmailSent = true;
+            document.getElementById('forgotStatus').textContent = 'Doğrulama kodu gönderildi. Mailinizi kontrol edin.';
+            showToast(data.message);
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) {
+        showToast('Sunucuya bağlanamadı!');
     }
 }
 
-// Sistemi başlat
+async function resetPasswordWithCode() {
+    const email = document.getElementById('forgot_email').value.trim().toLowerCase();
+    const code = document.getElementById('forgot_code').value.trim();
+    const newPass = document.getElementById('forgot_new_pass').value;
+
+    if (!email || !isValidEmail(email)) { showToast('Geçerli bir e-posta girin!'); return; }
+    if (!code) { showToast('Lütfen kodu girin!'); return; }
+    if (newPass.length < 4) { showToast('Yeni şifre en az 4 karakter olmalıdır!'); return; }
+
+    try {
+        const res = await fetch('/api/reset-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, token: code, newPassword: newPass })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            closeForgotModal();
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) {
+        showToast('Şifre güncelleme başarısız oldu!');
+    }
+}
+
+function showVerifyModal() {
+    document.getElementById('verify_email').value = document.getElementById('c_user').value.trim().toLowerCase();
+    document.getElementById('verify_code').value = '';
+    document.getElementById('verifyStatus').textContent = 'Mailinize gönderilen doğrulama kodunu girin.';
+    document.getElementById('verifyModal').classList.remove('hidden');
+}
+
+function closeVerifyModal() {
+    document.getElementById('verifyModal').classList.add('hidden');
+}
+
+async function verifyRegistrationCode() {
+    const email = document.getElementById('verify_email').value.trim().toLowerCase();
+    const code = document.getElementById('verify_code').value.trim();
+
+    if (!email || !isValidEmail(email)) { showToast('Geçerli bir e-posta girin!'); return; }
+    if (!code) { showToast('Lütfen kodu girin!'); return; }
+
+    try {
+        const res = await fetch('/api/verify-registration', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
+        });
+        const data = await res.json();
+        if (data.success) {
+            STATE.isVerified = true;
+            STATE.securityLevel = 'Yüksek';
+            showToast(data.message);
+            closeVerifyModal();
+            showContract();
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) {
+        showToast('Doğrulama başarısız oldu!');
+    }
+}
+
+async function resendVerificationCode() {
+    const email = document.getElementById('verify_email').value.trim().toLowerCase();
+    if (!email || !isValidEmail(email)) { showToast('Geçerli bir e-posta girin!'); return; }
+
+    try {
+        const res = await fetch('/api/resend-verification-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast(data.message);
+            document.getElementById('verifyStatus').textContent = 'Yeni kod gönderildi. Mailinizi kontrol edin.';
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) {
+        showToast('Kod tekrar gönderilemedi!');
+    }
+}
+
+// Yetkili girişi (Server odaklı)
+async function handleAdminGirisLocal() {
+    const key = document.getElementById('admin_key').value.trim();
+    
+    if (!key) { showToast('Yetkili anahtarı gerekli!'); return; }
+
+    try {
+        const res = await fetch('/save-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, mode: 'admin' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            STATE.userRole = 'admin';
+            tempUserData = { email: 'YETKILI@ADMIN', unit: data.unit, tc: data.unit };
+            setCurrentUserEmail('YETKILI@ADMIN');
+            showContract();
+        } else {
+            showToast(data.message);
+        }
+    } catch (e) { showToast('Yetkili girişi başarısız!'); }
+}
+
+// Sistemi Başlat ve Arayüzü Yükle
 function initSystem() {
+    // Her cihazda temiz başla - eski localStorage verilerini sıfırla
+    const keysToKeep = ['currentUserEmail', 'autoLogin'];
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach(key => {
+        if (!keysToKeep.includes(key)) {
+            localStorage.removeItem(key);
+        }
+    });
+
     const mainApp = document.getElementById('mainApp');
     const displayUser = document.getElementById('displayUser');
     const roleBadge = document.getElementById('roleBadge');
 
     mainApp.classList.remove('hidden');
-    displayUser.innerText = tempUserData.email || tempUserData.tc || 'Kullanıcı';
-
-    // Haritayı başlat - DOM hazır olana kadar bekle
-    setTimeout(() => {
-        if (typeof initMap === "function") {
-            initMap();
-        }
-    }, 100);
-
-    const voiceFab = document.querySelector('.voice-fab');
-    if (voiceFab) voiceFab.classList.toggle('hidden', STATE.userRole !== 'admin');
+    displayUser.innerText = tempUserData.email || 'Kullanıcı';
 
     if (STATE.userRole === 'admin') {
-        // Yetkili paneli
         document.getElementById('adminPanel').classList.remove('hidden');
         document.getElementById('citizenPanel').classList.add('hidden');
         roleBadge.innerText = tempUserData.unit || "YETKILI";
         roleBadge.style.background = "var(--primary)";
-
-        // Yetkili görünümünü başlat
-        setTimeout(() => {
-            if (typeof startAdminView === "function") startAdminView();
-            if (typeof updateAdminView === "function") updateAdminView();
-            if (typeof loadAnnouncements === "function") loadAnnouncements();
-            if (typeof loadMissingPersons === "function") loadMissingPersons();
-            if (typeof loadVerifications === "function") loadVerifications();
-        }, 1000);
+        if (typeof startAdminView === "function") startAdminView();
     } else {
-        // Vatandaş paneli
         document.getElementById('citizenPanel').classList.remove('hidden');
         document.getElementById('adminPanel').classList.add('hidden');
         roleBadge.innerText = "VATANDAŞ";
         roleBadge.style.background = "var(--secondary)";
-
-        // Bildirim izni iste
-        requestNotificationPermission();
-
-        // Gönüllü ve sohbet geçmişini yükle
-        setTimeout(() => {
-            if (typeof loadVolunteerList === 'function') loadVolunteerList();
-            if (typeof loadChatHistory === 'function') loadChatHistory();
+        
+        // Sunucudan kullanıcı verilerini yükle
+        if (typeof loadUserDataFromServer === 'function') {
+            loadUserDataFromServer().then(() => {
+                if (typeof loadFamilyMembers === 'function') loadFamilyMembers();
+            });
+        } else {
             if (typeof loadFamilyMembers === 'function') loadFamilyMembers();
+<<<<<<< HEAD
             if (typeof loadHelpRequests === 'function') loadHelpRequests();
         }, 1000);
     }
@@ -233,31 +452,40 @@ function onAuthSectionEnter(e) {
             showToast('Şifrenizi girin.');
             if (passEl) passEl.focus();
             return;
+=======
+>>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
         }
-        valideGiris();
-        return;
     }
+    
+    setTimeout(() => { if (window.map) window.map.invalidateSize(); }, 500);
+    showToast(`Hoş geldiniz!`);
+}
 
-    if (t.id === 'c_pass') {
-        e.preventDefault();
-        if (!String(t.value).trim()) {
-            showToast('Şifrenizi girin.');
-            t.focus();
-            return;
+async function logout() {
+    if (confirm('Çıkış yapmak istiyor musunuz?')) {
+        try {
+            await fetch('/logout', { method: 'POST' });
+            // Otomatik giriş verilerini temizle
+            localStorage.removeItem('autoLogin');
+        } catch (e) {
+            console.log('Logout request failed');
         }
-        valideGiris();
-        return;
+        location.reload(); // En temiz çıkış yöntemi
     }
+}
 
-    if (t.id === 'admin_key') {
-        e.preventDefault();
-        if (!String(t.value).trim()) {
-            showToast('Yetkili anahtarını girin.');
-            t.focus();
-            return;
+// Enter tuşu desteği
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const authSection = document.getElementById('authSection');
+        const contractModal = document.getElementById('contractModal');
+        if (!authSection.classList.contains('hidden')) {
+            valideGiris();
+        } else if (!contractModal.classList.contains('hidden')) {
+            confirmContract();
         }
-        handleAdminGirisLocal();
     }
+<<<<<<< HEAD
 }
 
 document.addEventListener('DOMContentLoaded', initAuthEnterSubmit);
@@ -375,3 +603,6 @@ function logout() {
         showToast('Güvenli çıkış yapıldı.');
     }
 }
+=======
+});
+>>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
