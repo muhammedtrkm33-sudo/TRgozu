@@ -1,72 +1,35 @@
-<<<<<<< HEAD
-﻿const crypto = require('node:crypto');
+const crypto = require('node:crypto');
 const express = require('express');
 const fs = require('node:fs');
 const path = require('node:path');
-const app = express();
+const nodemailer = require('nodemailer');
+const session = require('express-session');
+const sqlite3 = require('sqlite3').verbose();
 
+const app = express();
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, '.data');
-const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
+const DATABASE_FILE = path.join(ROOT, 'trgozu.db');
 const USERS_FILE = path.join(DATA_DIR, 'citizens.json');
 const SOS_FILE = path.join(DATA_DIR, 'sos.json');
 const MESSAGES_FILE = path.join(DATA_DIR, 'messages.json');
 const VOLUNTEERS_FILE = path.join(DATA_DIR, 'volunteers.json');
-const SESSION_COOKIE = 'trgozu_session';
-const sessions = new Map();
-const loginAttempts = new Map();
+const PORT = Number(process.env.PORT) || 10000;
+const SESSION_SECRET = process.env.SESSION_SECRET ||
+    (process.env.NODE_ENV === 'production' ? '' : crypto.randomBytes(48).toString('hex'));
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const RATE_WINDOW_MS = 15 * 60 * 1000;
-const MAX_LOGIN_ATTEMPTS = 10;
+const loginAttempts = new Map();
 const weatherRequests = new Map();
+const aiRequests = new Map();
+const activeCitizens = new Map();
 
-fs.mkdirSync(DATA_DIR, { recursive: true });
-app.disable('x-powered-by');
-app.use(express.json({ limit: '16kb' }));
-app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('X-Frame-Options', 'DENY');
-    next();
-=======
-﻿const express = require('express');
-const fs = require('fs');
-const cors = require('cors');
-const nodemailer = require('nodemailer');
-const path = require('path');
-const session = require('express-session');
-const sqlite3 = require('sqlite3').verbose();
-const app = express();
-
-// .env desteği: proje kökünde bir .env varsa okuyup process.env'e aktar
-const envPath = path.join(__dirname, '.env');
-if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    envContent.split(/\r?\n/).forEach(line => {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) return;
-        const idx = trimmed.indexOf('=');
-        if (idx > 0) {
-            const key = trimmed.slice(0, idx).trim();
-            const value = trimmed.slice(idx + 1).trim();
-            if (!(key in process.env)) {
-                process.env[key] = value;
-            }
-        }
-    });
+if (SESSION_SECRET.length < 32) {
+    throw new Error('SESSION_SECRET must be configured with at least 32 characters.');
 }
 
-// Aktif vatandaşları takip etmek için global array
-let activeCitizens = [];
-
-// JSON dosya tabanlı depolama
-const USERS_FILE = path.join(__dirname, 'users.json');
-const MESSAGES_FILE = path.join(__dirname, 'messages.json');
-
-// SQLite database
-const db = new sqlite3.Database(path.join(__dirname, 'trgozu.db'));
-
-// Initialize database tables
+fs.mkdirSync(DATA_DIR, { recursive: true });
+const db = new sqlite3.Database(DATABASE_FILE);
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS users (
         email TEXT PRIMARY KEY,
@@ -78,360 +41,100 @@ db.serialize(() => {
         resetToken TEXT,
         resetExpires INTEGER
     )`);
-    
-    db.run(`CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sender TEXT,
-        receiver TEXT,
-        message TEXT,
-        timestamp TEXT
-    )`);
-
     db.run(`CREATE TABLE IF NOT EXISTS user_data (
         email TEXT PRIMARY KEY,
-        family TEXT,
-        announcements TEXT,
-        missingPersons TEXT,
-        helpRequests TEXT,
-        citizens TEXT,
-        sosList TEXT,
-        threads TEXT,
-        chatMessages TEXT,
+        family TEXT DEFAULT '[]',
+        announcements TEXT DEFAULT '[]',
+        missingPersons TEXT DEFAULT '[]',
+        helpRequests TEXT DEFAULT '[]',
+        citizens TEXT DEFAULT '[]',
+        sosList TEXT DEFAULT '[]',
+        threads TEXT DEFAULT '[]',
+        chatMessages TEXT DEFAULT '[]',
         lastUpdated TEXT
     )`);
->>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
+    db.run(`CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender TEXT NOT NULL,
+        receiver TEXT NOT NULL,
+        message TEXT NOT NULL,
+        timestamp TEXT NOT NULL
+    )`);
 });
 
-const readJSON = (file) => {
-    if (!fs.existsSync(file)) return [];
-<<<<<<< HEAD
-    try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return []; }
-=======
-    try {
-        return JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch (e) {
-        console.error('Dosya okuma hatası:', e);
-        return [];
-    }
->>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
-};
-
-const writeJSON = (file, data) => {
-    try {
-        fs.writeFileSync(file, JSON.stringify(data, null, 2));
-    } catch (e) {
-        console.error('Dosya yazma hatası:', e);
-    }
-};
-
-// CORS Ayarı: Her yerden gelen isteğe izin ver (Android ve Web için şart)
-app.use(cors());
-app.use(express.json());
-
-// JSON parse hatalarını sessizce handle et
-app.use((err, req, res, next) => {
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-        console.warn('Geçersiz JSON request', req.method, req.path);
-        return res.status(400).json({ success: false, message: 'Geçersiz JSON' });
-    }
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
+app.use(express.json({ limit: '32kb' }));
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     next();
 });
 
-// Session Ayarı
 app.use(session({
-    secret: 'tr-gozu-secret-key-2024',
+    name: 'trgozu_session',
+    secret: SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: { 
-        secure: false, // Render'da HTTPS varsa true yap
-        maxAge: 24 * 60 * 60 * 1000 // 24 saat
+    cookie: {
+        httpOnly: true,
+        sameSite: 'strict',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: SESSION_TTL_MS
     }
 }));
 
-// Statik Dosyalar: index.html ana dizindeyse '.' kullanıyoruz
-app.use(express.static('.'));
-
-// PORT Ayarı: Render'daki ayarın 10000 ise bu kod ona uyar
-const PORT = process.env.PORT || 10000;
-
-const emailUser = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SMTP_USERNAME || process.env.EMAIL_USERNAME;
-const emailPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASSWORD;
-const emailHost = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
-const emailPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : (process.env.EMAIL_PORT ? Number(process.env.EMAIL_PORT) : 587);
-const emailSecure = (process.env.SMTP_SECURE || process.env.EMAIL_SECURE) === 'true';
-const emailFrom = process.env.SMTP_FROM || process.env.EMAIL_FROM || (emailUser ? `TR-GOZU <${emailUser}>` : undefined);
-const emailCredentialsArePlaceholder = (emailUser && /your[-_]?email/i.test(emailUser)) || (emailPass && /app[-_]?password/i.test(emailPass));
-const emailConfigured = Boolean(emailUser && emailPass && !emailCredentialsArePlaceholder);
-
-if (!emailConfigured) {
-    console.error('!!! UYARI: SMTP_USER / SMTP_PASS veya EMAIL_USER / EMAIL_PASS environment değişkenleri eksik veya hatalı. Render ortamınızı kontrol edin.');
-} else {
-    console.log(`Email yapılandırması kullanılıyor: ${emailUser} @ ${emailHost}:${emailPort} secure=${emailSecure} from=${emailFrom}`);
-}
-
-const transporter = emailConfigured ? nodemailer.createTransport({
-    host: emailHost,
-    port: emailPort,
-    secure: emailSecure,
-    auth: {
-        user: emailUser,
-        pass: emailPass
-    },
-    requireTLS: !emailSecure,
-    tls: {
-        rejectUnauthorized: false,
-        minVersion: 'TLSv1.2'
-    }
-}) : null;
-
-if (transporter) {
-    transporter.verify((error, success) => {
-        if (error) {
-            console.error('Email bağlantı hatası:', error);
-            if (error.responseCode === 535) {
-                console.error('SMTP kullanıcı adı veya şifre hatalı. Lütfen SMTP_USER/SMTP_PASS bilgilerinizi kontrol edin.');
-            }
-        } else {
-            console.log('Email sunucusu bağlantısı başarılı');
-        }
-    });
-}
-
-const sendEmail = async (to, subject, html) => {
-    if (!transporter) {
-        const errorMessage = 'Email yapılandırması eksik. SMTP_USER / SMTP_PASS veya EMAIL_USER / EMAIL_PASS ortam değişkenlerini ayarlayın.';
-        console.error(errorMessage);
-        return { success: false, error: errorMessage };
-    }
-
-    try {
-        const info = await transporter.sendMail({
-            from: emailFrom,
-            to,
-            replyTo: emailFrom,
-            subject,
-            html
-        });
-        console.log(`Email gönderildi: ${to}`, info.messageId);
-        return { success: true, info };
-    } catch (error) {
-        console.error('Email hatası:', error);
-        return { success: false, error: error.message || error };
-    }
-};
-
-// Session kontrol middleware'i
-function requireAuth(req, res, next) {
-    if (req.session.user) {
-        next();
-    } else {
-        return res.status(401).json({ success: false, message: "Oturum açmanız gerekiyor!" });
-    }
-}
-
-// --- ROTALAR (ENDPOINTS) ---
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/api/active-citizens', requireAuth, (req, res) => {
-    // Sadece yetkililer görebilir
-    if (req.session.user.role !== 'admin') {
-        return res.status(403).json({ success: false, message: "Yetkisiz erişim!" });
-    }
-    return res.json({ success: true, citizens: activeCitizens });
-});
-
-// Session kontrolü - Otomatik girişi devre dışı bırak
-app.get('/check-session', (req, res) => {
-    // Her zaman loggedIn: false döndür - Kullanıcı her açılışta manuel giriş yapsın
-    return res.json({ loggedIn: false });
-});
-
-// Logout
-app.post('/logout', (req, res) => {
-    // Aktif vatandaşlar listesinden çıkar
-    if (req.session.user && req.session.user.role === 'citizen') {
-        activeCitizens = activeCitizens.filter(c => c.email !== req.session.user.email);
-    }
-    
-    req.session.destroy((err) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: "Çıkış yapılamadı!" });
-        }
-        return res.json({ success: true, message: "Çıkış başarılı." });
-    });
-});
-
-<<<<<<< HEAD
-function getSessionToken(req) {
-    const cookie = req.headers.cookie || '';
-    const match = cookie.match(/(?:^|;\s*)trgozu_session=([^;]+)/);
-    return match ? match[1] : '';
-}
-
-function issueSession(res, session) {
-    const token = crypto.randomBytes(32).toString('hex');
-    sessions.set(token, { ...session, expiresAt: Date.now() + SESSION_TTL_MS });
-    const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}`);
-}
-
-function checkLoginRate(req, res) {
-    const key = req.ip;
-    const now = Date.now();
-    const record = loginAttempts.get(key);
-    if (record && now - record.startedAt < RATE_WINDOW_MS && record.count >= MAX_LOGIN_ATTEMPTS) {
-        res.status(429).json({ success: false, message: 'Çok fazla giriş denemesi. Daha sonra tekrar deneyin.' });
-        return false;
-    }
-    if (!record || now - record.startedAt >= RATE_WINDOW_MS) loginAttempts.set(key, { startedAt: now, count: 1 });
-    else record.count += 1;
-    return true;
-}
-
-function checkWeatherRate(req, res) {
-    const now = Date.now();
-    const record = weatherRequests.get(req.ip);
-    if (record && now - record.startedAt < RATE_WINDOW_MS && record.count >= 120) {
-        res.status(429).json({ error: 'İstek sınırına ulaşıldı.' });
-        return false;
-=======
-app.post('/save-user', (req, res) => {
-    const { email, pass, mode, key } = req.body;
-
-    if (mode === 'reg') {
-        if (!email || !pass) {
-            return res.status(400).json({ success: false, message: "Email ve şifre gereklidir!" });
-        }
-
-        db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, row) => {
-            if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-            if (row && row.isVerified) {
-                return res.status(400).json({ success: false, message: "Bu email zaten kayıtlı!" });
-            }
-
-            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            const verificationExpires = Date.now() + 3600000; // 1 saat
-            const host = req.get('host') || `localhost:${PORT}`;
-            const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-            const verifyLink = `${protocol}://${host}`;
-            const emailHtml = `<p>Hesabınızı doğrulamak için doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye geri dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`;
-
-            if (row) {
-                db.run(`UPDATE users SET pass = ?, verificationCode = ?, verificationExpires = ? WHERE email = ?`,
-                    [pass, verificationCode, verificationExpires, email], async function(err) {
-                    if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
-
-                    const emailResult = await sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', emailHtml);
-                    if (!emailResult.success) {
-                        return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
-                    }
-                    return res.json({ success: true, message: "Hesabınız doğrulanmamıştı; yeni kod mailinize gönderildi." });
-                });
-                return;
-            }
-
-            db.run(`INSERT INTO users (email, pass, created, isVerified, verificationCode, verificationExpires) VALUES (?, ?, ?, 0, ?, ?)`,
-                [email, pass, new Date().toISOString(), verificationCode, verificationExpires], async function(err) {
-                if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
-
-                const emailResult = await sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', emailHtml);
-                if (!emailResult.success) {
-                    return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
-                }
-                return res.json({ success: true, message: "Kayıt başarılı! Mailinize gönderilen kodla hesabınızı doğrulayın." });
-            });
-        });
-        return;
-    }
-
-    if (mode === 'login') {
-        if (!email || !pass) {
-            return res.status(400).json({ success: false, message: "Email ve şifre gereklidir!" });
-        }
-
-        db.get(`SELECT * FROM users WHERE email = ?`, [email], (err, user) => {
-            if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-            if (!user) return res.status(404).json({ success: false, message: "Kullanıcı bulunamadı!" });
-            if (user.pass !== pass) return res.status(401).json({ success: false, message: "Şifre yanlış!" });
-
-            // Güvenlik seviyesini belirle
-            const securityLevel = user.isVerified ? 'Yüksek' : 'Düşük';
-            const securityMessage = user.isVerified ? 'Email doğrulandı' : 'Bu hesap doğrulanmadı - Güvenlik Düşük';
-
-            req.session.user = {
-                email: user.email,
-                role: 'citizen',
-                isVerified: user.isVerified,
-                securityLevel: securityLevel,
-                loginTime: new Date().toISOString()
-            };
-
-            const citizenInfo = {
-                email: user.email,
-                isVerified: user.isVerified,
-                securityLevel: securityLevel,
-                loginTime: new Date().toISOString(),
-                sessionId: req.sessionID
-            };
-            const existingIndex = activeCitizens.findIndex(c => c.email === user.email);
-            if (existingIndex >= 0) {
-                activeCitizens[existingIndex] = citizenInfo;
-            } else {
-                activeCitizens.push(citizenInfo);
-            }
-
-            return res.json({ 
-                success: true, 
-                message: "Giriş başarılı.", 
-                isVerified: user.isVerified,
-                securityLevel: securityLevel,
-                securityMessage: securityMessage
-            });
-        });
-        return;
-    }
-
-    if (mode === 'admin') {
-        const adminKeys = JSON.parse(fs.readFileSync(path.join(__dirname, 'yetkili.json'), 'utf8'));
-        const keyEntry = adminKeys.authorized_keys.find(item => item.key === key);
-        const unit = keyEntry ? keyEntry.unit : null;
-        if (unit) {
-            req.session.user = {
-                email: 'YETKILI@ADMIN',
-                role: 'admin',
-                unit: unit,
-                tc: unit,
-                loginTime: new Date().toISOString()
-            };
-            return res.json({ success: true, message: "Yetkili giriş başarılı.", unit });
-        } else {
-            return res.status(401).json({ success: false, message: "Hatalı Yetkili Anahtarı!" });
-        }
->>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
-    }
-    if (!record || now - record.startedAt >= RATE_WINDOW_MS) weatherRequests.set(req.ip, { startedAt: now, count: 1 });
-    else record.count += 1;
-    return true;
-}
-
 function rejectCrossOrigin(req, res, next) {
     const origin = req.get('origin');
-    if (origin) {
-        let originHost;
-        try { originHost = new URL(origin).host; } catch (error) {
-            return res.status(403).json({ success: false, message: 'İstek kaynağı reddedildi.' });
-        }
-        if (originHost !== req.get('host')) {
-            return res.status(403).json({ success: false, message: 'İstek kaynağı reddedildi.' });
-        }
+    if (!origin) return next();
+    try {
+        if (new URL(origin).host === req.get('host')) return next();
+    } catch (error) {
+        return res.status(403).json({ success: false, message: 'İstek kaynağı reddedildi.' });
     }
-    next();
+    return res.status(403).json({ success: false, message: 'İstek kaynağı reddedildi.' });
 }
 
-function scrypt(password, salt) {
+app.use(['/api', '/save-user', '/logout'], rejectCrossOrigin);
+
+function readJSON(file) {
+    if (!fs.existsSync(file)) return [];
+    try {
+        const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+        return Array.isArray(value) ? value : [];
+    } catch (error) {
+        console.error('Data file could not be read:', path.basename(file));
+        return [];
+    }
+}
+
+function writeJSON(file, data) {
+    fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+function withDatabase(query, params = []) {
+    return new Promise((resolve, reject) => {
+        db.get(query, params, (error, row) => error ? reject(error) : resolve(row));
+    });
+}
+
+function runDatabase(query, params = []) {
+    return new Promise((resolve, reject) => {
+        db.run(query, params, function (error) {
+            if (error) reject(error);
+            else resolve(this);
+        });
+    });
+}
+
+function allDatabase(query, params = []) {
+    return new Promise((resolve, reject) => {
+        db.all(query, params, (error, rows) => error ? reject(error) : resolve(rows));
+    });
+}
+
+function derivePassword(password, salt) {
     return new Promise((resolve, reject) => {
         crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }, (error, key) => {
             if (error) reject(error);
@@ -440,71 +143,342 @@ function scrypt(password, salt) {
     });
 }
 
-app.use('/api', rejectCrossOrigin);
+async function hashPassword(password) {
+    const salt = crypto.randomBytes(16).toString('hex');
+    return `scrypt$${salt}$${await derivePassword(password, salt)}`;
+}
 
-app.post('/api/auth/citizen', async (req, res) => {
-    if (!checkLoginRate(req, res)) return;
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-    const password = typeof body.password === 'string' ? body.password : '';
+async function verifyPassword(password, stored) {
+    const [algorithm, salt, expected] = String(stored || '').split('$');
+    if (algorithm !== 'scrypt' || !salt || !expected) return stored === password;
+    const actual = Buffer.from(await derivePassword(password, salt), 'hex');
+    const expectedBuffer = Buffer.from(expected, 'hex');
+    return actual.length === expectedBuffer.length && crypto.timingSafeEqual(actual, expectedBuffer);
+}
+
+function allowRequest(limits, key, maximum, res) {
+    const now = Date.now();
+    const record = limits.get(key);
+    if (record && now - record.startedAt < RATE_WINDOW_MS && record.count >= maximum) {
+        res.status(429).json({ success: false, message: 'Çok fazla istek. Daha sonra tekrar deneyin.' });
+        return false;
+    }
+    if (!record || now - record.startedAt >= RATE_WINDOW_MS) limits.set(key, { startedAt: now, count: 1 });
+    else record.count += 1;
+    return true;
+}
+
+function allowLogin(req, res) {
+    return allowRequest(loginAttempts, req.ip, 10, res);
+}
+
+function requireAuth(req, res, next) {
+    if (!req.session.user) return res.status(401).json({ success: false, message: 'Oturum açmanız gerekiyor.' });
+    next();
+}
+
+function requireAdmin(req, res, next) {
+    if (req.session.user?.role !== 'admin') return res.status(403).json({ success: false, message: 'Yetki gerekiyor.' });
+    next();
+}
+
+function regenerateSession(req, user) {
+    return new Promise((resolve, reject) => {
+        req.session.regenerate(error => {
+            if (error) return reject(error);
+            req.session.user = user;
+            req.session.save(saveError => saveError ? reject(saveError) : resolve());
+        });
+    });
+}
+
+async function sendEmail(to, subject, code, purpose) {
+    const user = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SMTP_USERNAME || process.env.EMAIL_USERNAME;
+    const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASSWORD;
+    if (!user || !pass) return false;
+
+    const host = process.env.SMTP_HOST || process.env.EMAIL_HOST || 'smtp.gmail.com';
+    const port = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT || 587);
+    const secure = (process.env.SMTP_SECURE || process.env.EMAIL_SECURE) === 'true';
+    const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        requireTLS: !secure,
+        auth: { user, pass },
+        tls: { minVersion: 'TLSv1.2' }
+    });
+
+    try {
+        await transporter.sendMail({
+            from: process.env.SMTP_FROM || process.env.EMAIL_FROM || `TR-GOZU <${user}>`,
+            to,
+            subject,
+            text: `${purpose}: ${code}. Kod 1 saat geçerlidir.`,
+            disableFileAccess: true,
+            disableUrlAccess: true
+        });
+        return true;
+    } catch (error) {
+        console.error('Email delivery failed:', error.message);
+        return false;
+    } finally {
+        transporter.close();
+    }
+}
+
+function normalizeEmail(value) {
+    return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function validEmail(email) {
+    return /^[^\s@]+@gmail\.com$/i.test(email);
+}
+
+function setSessionUser(req, res, user) {
+    regenerateSession(req, user)
+        .then(() => res.json({
+            success: true,
+            user,
+            unit: user.unit,
+            isVerified: user.isVerified,
+            securityLevel: user.isVerified ? 'Yüksek' : 'Düşük'
+        }))
+        .catch(error => {
+            console.error('Session could not be created:', error.message);
+            res.status(500).json({ success: false, message: 'Oturum açılamadı.' });
+        });
+}
+
+app.post('/save-user', async (req, res) => {
+    if (!allowLogin(req, res)) return;
+    const body = req.body || {};
+    const email = normalizeEmail(body.email);
+    const password = typeof body.pass === 'string' ? body.pass : '';
     const mode = body.mode;
-    if (!/^[^\s@]+@gmail\.com$/i.test(email) || password.length < 8 || password.length > 128 || !['register', 'login'].includes(mode)) {
-        return res.status(400).json({ success: false, message: 'E-posta, şifre veya işlem geçersiz. Şifre en az 8 karakter olmalıdır.' });
+
+    if (mode === 'admin') {
+        const expected = process.env.ADMIN_ACCESS_KEY || '';
+        const supplied = typeof body.key === 'string' ? body.key : '';
+        const expectedBuffer = Buffer.from(expected);
+        const suppliedBuffer = Buffer.from(supplied);
+        if (expected.length < 16) return res.status(503).json({ success: false, message: 'Yetkili anahtarı sunucuda ayarlanmamış.' });
+        if (expectedBuffer.length !== suppliedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, suppliedBuffer)) {
+            return res.status(401).json({ success: false, message: 'Yetkili anahtarı hatalı.' });
+        }
+        const unit = process.env.ADMIN_UNIT || 'Yetkili';
+        return setSessionUser(req, res, { email: 'YETKILI@ADMIN', role: 'admin', unit });
     }
 
-    const accounts = readJSON(ACCOUNTS_FILE);
-    const account = accounts.find(item => item.email === email);
-    if (mode === 'register') {
-        if (account) return res.status(409).json({ success: false, message: 'Bu e-posta zaten kayıtlı.' });
-        const salt = crypto.randomBytes(16).toString('hex');
-        accounts.push({ email, salt, passwordHash: await scrypt(password, salt), createdAt: new Date().toISOString() });
-        writeJSON(ACCOUNTS_FILE, accounts);
-    } else {
-        const candidate = account ? await scrypt(password, account.salt) : '';
-        const valid = account && crypto.timingSafeEqual(Buffer.from(candidate), Buffer.from(account.passwordHash));
-        if (!valid) {
+    if (!validEmail(email) || password.length < 8 || password.length > 128 || !['reg', 'login'].includes(mode)) {
+        return res.status(400).json({ success: false, message: 'E-posta veya şifre geçersiz. Şifre en az 8 karakter olmalıdır.' });
+    }
+
+    try {
+        const user = await withDatabase('SELECT * FROM users WHERE email = ?', [email]);
+        if (mode === 'reg') {
+            if (user?.isVerified) return res.status(409).json({ success: false, message: 'Bu e-posta zaten kayıtlı.' });
+            const code = String(crypto.randomInt(100000, 1000000));
+            const expires = Date.now() + 60 * 60 * 1000;
+            const passwordHash = await hashPassword(password);
+            if (user) {
+                await runDatabase('UPDATE users SET pass = ?, verificationCode = ?, verificationExpires = ? WHERE email = ?', [passwordHash, code, expires, email]);
+            } else {
+                await runDatabase('INSERT INTO users (email, pass, created, isVerified, verificationCode, verificationExpires) VALUES (?, ?, ?, 0, ?, ?)', [email, passwordHash, new Date().toISOString(), code, expires]);
+            }
+            if (!await sendEmail(email, 'TR-GOZU Kayıt Doğrulama Kodu', code, 'Doğrulama kodunuz')) {
+                return res.status(503).json({ success: false, message: 'E-posta gönderilemedi; sunucu SMTP ayarlarını kontrol edin.' });
+            }
+            return res.json({ success: true, message: user ? 'Yeni doğrulama kodu gönderildi.' : 'Kayıt başarılı. E-postanıza gelen kodla hesabınızı doğrulayın.' });
+        }
+
+        if (!user || !await verifyPassword(password, user.pass)) {
             return res.status(401).json({ success: false, message: 'E-posta veya şifre hatalı.' });
         }
-    }
+        if (!String(user.pass).startsWith('scrypt$')) {
+            await runDatabase('UPDATE users SET pass = ? WHERE email = ?', [await hashPassword(password), email]);
+        }
+        if (!user.isVerified) {
+            return res.status(403).json({ success: false, needsVerification: true, message: 'E-posta doğrulamanız gerekiyor.' });
+        }
 
-    issueSession(res, { role: 'citizen', email });
-    res.json({ success: true });
+        const loginTime = new Date().toISOString();
+        const sessionUser = { email, role: 'citizen', isVerified: true, securityLevel: 'Yüksek', loginTime };
+        await regenerateSession(req, sessionUser);
+        activeCitizens.set(email, { ...sessionUser, sessionId: req.sessionID });
+        return res.json({ success: true, message: 'Giriş başarılı.', isVerified: true, securityLevel: 'Yüksek' });
+    } catch (error) {
+        console.error('Account request failed:', error.message);
+        return res.status(500).json({ success: false, message: 'İşlem tamamlanamadı.' });
+    }
 });
 
 app.post('/api/auth/admin', (req, res) => {
-    if (!checkLoginRate(req, res)) return;
-    const expected = process.env.ADMIN_ACCESS_KEY || '';
-    const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const supplied = typeof body.key === 'string' ? body.key : '';
-    if (expected.length < 16) {
-        return res.status(503).json({ success: false, message: 'Yetkili girişi sunucuda yapılandırılmamış.' });
-    }
-    const suppliedBuffer = Buffer.from(supplied);
-    const expectedBuffer = Buffer.from(expected);
-    if (suppliedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(suppliedBuffer, expectedBuffer)) {
-        return res.status(401).json({ success: false, message: 'Yetkili anahtarı hatalı.' });
-    }
-    issueSession(res, { role: 'admin', unit: process.env.ADMIN_UNIT || 'Yetkili' });
-    res.json({ success: true, unit: process.env.ADMIN_UNIT || 'Yetkili' });
+    req.body = { ...(req.body || {}), mode: 'admin' };
+    req.url = '/save-user';
+    app.handle(req, res);
 });
 
-app.post('/api/auth/logout', (req, res) => {
-    sessions.delete(getSessionToken(req));
-    const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}`);
-    res.json({ success: true });
+app.get('/check-session', (req, res) => res.json({ loggedIn: false }));
+
+app.post('/logout', (req, res) => {
+    const email = req.session.user?.email;
+    if (email) activeCitizens.delete(email);
+    req.session.destroy(error => {
+        if (error) return res.status(500).json({ success: false, message: 'Çıkış yapılamadı.' });
+        res.clearCookie('trgozu_session', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+        res.json({ success: true });
+    });
 });
 
-app.use('/api', (req, res, next) => {
-    const token = getSessionToken(req);
-    const session = sessions.get(token);
-    if (!session || session.expiresAt <= Date.now()) {
-        sessions.delete(token);
-        return res.status(401).json({ success: false, message: 'Oturum açmanız gerekiyor.' });
+app.post('/api/forgot-password', async (req, res) => {
+    if (!allowLogin(req, res)) return;
+    const email = normalizeEmail(req.body?.email);
+    if (!validEmail(email)) return res.status(400).json({ success: false, message: 'Geçerli bir e-posta gerekli.' });
+    try {
+        const user = await withDatabase('SELECT email FROM users WHERE email = ?', [email]);
+        if (user) {
+            const code = String(crypto.randomInt(100000, 1000000));
+            await runDatabase('UPDATE users SET resetToken = ?, resetExpires = ? WHERE email = ?', [code, Date.now() + 60 * 60 * 1000, email]);
+            if (!await sendEmail(email, 'TR-GOZU Şifre Sıfırlama Kodu', code, 'Şifre sıfırlama kodunuz')) {
+                return res.status(503).json({ success: false, message: 'E-posta gönderilemedi; SMTP ayarlarını kontrol edin.' });
+            }
+        }
+        res.json({ success: true, message: 'Adres kayıtlıysa sıfırlama kodu gönderildi.' });
+    } catch (error) {
+        console.error('Password reset request failed:', error.message);
+        res.status(500).json({ success: false, message: 'İşlem tamamlanamadı.' });
     }
-    req.session = session;
-    next();
 });
+
+app.post('/api/verify-registration', async (req, res) => {
+    if (!allowLogin(req, res)) return;
+    const email = normalizeEmail(req.body?.email);
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!validEmail(email) || !/^\d{6}$/.test(code)) return res.status(400).json({ success: false, message: 'E-posta veya kod geçersiz.' });
+    try {
+        const user = await withDatabase('SELECT email FROM users WHERE email = ? AND verificationCode = ? AND verificationExpires > ?', [email, code, Date.now()]);
+        if (!user) return res.status(400).json({ success: false, message: 'Kod geçersiz veya süresi dolmuş.' });
+        await runDatabase('UPDATE users SET isVerified = 1, verificationCode = NULL, verificationExpires = NULL WHERE email = ?', [email]);
+        await regenerateSession(req, { email, role: 'citizen', isVerified: true, securityLevel: 'Yüksek', loginTime: new Date().toISOString() });
+        res.json({ success: true, message: 'Hesabınız doğrulandı.', isVerified: true, securityLevel: 'Yüksek' });
+    } catch (error) {
+        console.error('Registration verification failed:', error.message);
+        res.status(500).json({ success: false, message: 'Doğrulama tamamlanamadı.' });
+    }
+});
+
+app.post('/api/resend-verification-code', async (req, res) => {
+    if (!allowLogin(req, res)) return;
+    const email = normalizeEmail(req.body?.email);
+    if (!validEmail(email)) return res.status(400).json({ success: false, message: 'Geçerli bir e-posta gerekli.' });
+    try {
+        const user = await withDatabase('SELECT isVerified FROM users WHERE email = ?', [email]);
+        if (!user || user.isVerified) return res.json({ success: true, message: 'Adres kayıtlı ve doğrulanmamışsa yeni kod gönderildi.' });
+        const code = String(crypto.randomInt(100000, 1000000));
+        await runDatabase('UPDATE users SET verificationCode = ?, verificationExpires = ? WHERE email = ?', [code, Date.now() + 60 * 60 * 1000, email]);
+        if (!await sendEmail(email, 'TR-GOZU Doğrulama Kodu', code, 'Yeni doğrulama kodunuz')) {
+            return res.status(503).json({ success: false, message: 'E-posta gönderilemedi; SMTP ayarlarını kontrol edin.' });
+        }
+        res.json({ success: true, message: 'Yeni doğrulama kodu gönderildi.' });
+    } catch (error) {
+        console.error('Verification resend failed:', error.message);
+        res.status(500).json({ success: false, message: 'İşlem tamamlanamadı.' });
+    }
+});
+
+app.post('/api/reset-password', async (req, res) => {
+    if (!allowLogin(req, res)) return;
+    const email = normalizeEmail(req.body?.email);
+    const code = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    const password = typeof req.body?.newPassword === 'string' ? req.body.newPassword : '';
+    if (!validEmail(email) || !/^\d{6}$/.test(code) || password.length < 8 || password.length > 128) {
+        return res.status(400).json({ success: false, message: 'Bilgiler geçersiz; yeni şifre en az 8 karakter olmalıdır.' });
+    }
+    try {
+        const user = await withDatabase('SELECT email FROM users WHERE email = ? AND resetToken = ? AND resetExpires > ?', [email, code, Date.now()]);
+        if (!user) return res.status(400).json({ success: false, message: 'Kod geçersiz veya süresi dolmuş.' });
+        await runDatabase('UPDATE users SET pass = ?, resetToken = NULL, resetExpires = NULL WHERE email = ?', [await hashPassword(password), email]);
+        res.json({ success: true, message: 'Şifre güncellendi.' });
+    } catch (error) {
+        console.error('Password reset failed:', error.message);
+        res.status(500).json({ success: false, message: 'İşlem tamamlanamadı.' });
+    }
+});
+
+app.use('/api', requireAuth);
+
+app.post('/api/chat', async (req, res) => {
+    if (!allowRequest(aiRequests, req.ip, 20, res)) return;
+    const apiKey = process.env.AI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'AI_API_KEY is not configured.' });
+
+    const body = req.body || {};
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+    if (!message || message.length > 2000) {
+        return res.status(400).json({ error: 'Message must be between 1 and 2000 characters.' });
+    }
+
+    const history = Array.isArray(body.messages)
+        ? body.messages
+            .filter(item => item && ['user', 'assistant'].includes(item.role) && typeof item.content === 'string')
+            .slice(-12)
+            .map(item => ({ role: item.role, content: item.content.slice(0, 2000) }))
+        : [];
+    if (history[history.length - 1]?.role !== 'user' || history[history.length - 1]?.content !== message) {
+        history.push({ role: 'user', content: message });
+    }
+
+    let apiUrl;
+    try {
+        apiUrl = new URL(process.env.AI_API_URL || 'https://api.openai.com/v1/chat/completions');
+        if (process.env.NODE_ENV === 'production' && apiUrl.protocol !== 'https:') {
+            return res.status(500).json({ error: 'AI_API_URL must use HTTPS in production.' });
+        }
+    } catch (error) {
+        return res.status(500).json({ error: 'AI_API_URL is invalid.' });
+    }
+
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: process.env.AI_MODEL || 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'Türkçe yanıt veren TR-GOZU afet ve acil durum destek asistanısın. Kısa, anlaşılır ve güvenlik odaklı cevap ver. Güncel olay, konum veya sistem verisine erişimin olmadığını varsay; veri uydurma. Tıbbi teşhis koyma. Hayati tehlikede kullanıcıyı 112\'yi aramaya yönlendir. Uygulama dışı konularda nazikçe afet güvenliği kapsamına dön.'
+                    },
+                    ...history
+                ],
+                temperature: 0.4,
+                max_tokens: 500
+            }),
+            signal: AbortSignal.timeout(25000)
+        });
+        if (!response.ok) {
+            console.warn('AI provider returned HTTP', response.status);
+            return res.status(502).json({ error: 'AI sağlayıcısı yanıt veremedi.' });
+        }
+        const data = await response.json();
+        const reply = data.choices?.[0]?.message?.content;
+        if (typeof reply !== 'string' || !reply.trim()) {
+            return res.status(502).json({ error: 'AI sağlayıcısı boş yanıt verdi.' });
+        }
+        res.json({ reply: reply.trim() });
+    } catch (error) {
+        console.error('AI request failed:', error.name === 'TimeoutError' ? 'timeout' : error.message);
+        res.status(502).json({ error: 'AI hizmetine ulaşılamadı.' });
+    }
+});
+
+function checkWeatherRate(req, res) {
+    return allowRequest(weatherRequests, req.ip, 120, res);
+}
 
 async function proxyWeather(req, res, endpoint, extra = {}) {
     if (!checkWeatherRate(req, res)) return;
@@ -515,7 +489,6 @@ async function proxyWeather(req, res, endpoint, extra = {}) {
     if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
         return res.status(400).json({ error: 'Koordinatlar geçersiz.' });
     }
-
     const url = new URL(`https://api.openweathermap.org/data/2.5/${endpoint}`);
     url.searchParams.set('lat', String(lat));
     url.searchParams.set('lon', String(lon));
@@ -523,7 +496,6 @@ async function proxyWeather(req, res, endpoint, extra = {}) {
     url.searchParams.set('units', 'metric');
     url.searchParams.set('lang', 'tr');
     for (const [key, value] of Object.entries(extra)) url.searchParams.set(key, value);
-
     try {
         const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
         if (!response.ok) return res.status(502).json({ error: 'Hava sağlayıcısı yanıt vermedi.' });
@@ -537,267 +509,120 @@ app.get('/api/weather/current', (req, res) => proxyWeather(req, res, 'weather'))
 app.get('/api/weather/forecast', (req, res) => proxyWeather(req, res, 'forecast', { cnt: '16' }));
 app.get('/api/weather/air-pollution', (req, res) => proxyWeather(req, res, 'air_pollution'));
 
-app.use('/api', (req, res, next) => {
-    if (req.session.role !== 'admin') return res.status(403).json({ success: false, message: 'Yetki gerekiyor.' });
-    next();
-});
+app.get('/api/active-citizens', requireAdmin, (req, res) => res.json({ success: true, citizens: Array.from(activeCitizens.values()) }));
+app.get('/api/citizens', requireAdmin, (req, res) => res.json(readJSON(USERS_FILE)));
 
-<<<<<<< HEAD
 app.post('/api/citizen/update', (req, res) => {
-    const { email, lat, lng, lastActive, lastMoveAt, healthStatus, healthNote, battery, isSOS, isPanic } = req.body;
-    const users = readJSON(USERS_FILE);
-    const idx = users.findIndex(user => user.email === email);
-    if (idx === -1) {
-        users.push({ email, lat, lng, lastActive, lastMoveAt, healthStatus, healthNote, battery, isSOS: !!isSOS, isPanic: !!isPanic });
-    } else {
-        for (const [key, value] of Object.entries({ lat, lng, lastActive, lastMoveAt, healthStatus, healthNote, battery, isSOS, isPanic })) {
-            if (value !== undefined) users[idx][key] = value;
-        }
-=======
-// Şifre Sıfırlama Rotaları
-app.post('/api/forgot-password', (req, res) => {
-    const { email } = req.body;
-    const normalizedEmail = email ? email.trim().toLowerCase() : '';
-
-    if (!normalizedEmail) {
-        return res.status(400).json({ success: false, message: "Email gereklidir!" });
->>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
-    }
-    if (!emailConfigured) {
-        return res.status(500).json({ success: false, message: "Email yapılandırması eksik. Lütfen EMAIL_USER / SMTP_USER ve EMAIL_PASS / SMTP_PASS ortam değişkenlerini kontrol edin." });
-    }
-
-    db.get(`SELECT * FROM users WHERE email = ?`, [normalizedEmail], (err, user) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
-        
-        const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-        db.run(`UPDATE users SET resetToken = ?, resetExpires = ? WHERE email = ?`,
-            [resetCode, Date.now() + 3600000, normalizedEmail], async function(err) {
-            if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-            
-            const resetLinkHost = req.get('host') || `localhost:${PORT}`;
-            const resetLinkProtocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-            const resetLink = `${resetLinkProtocol}://${resetLinkHost}`;
-            const emailResult = await sendEmail(normalizedEmail, 'TR-GOZU Şifre Sıfırlama Kodu', `<p>Şifrenizi sıfırlamak için doğrulama kodunuz: <b>${resetCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Eğer siteye dönmek isterseniz <a href="${resetLink}">buraya tıklayın</a>.</p>`);
-            if (!emailResult.success) {
-                return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
-            }
-            return res.json({ success: true, message: "Doğrulama kodu mailinize gönderildi!" });
-        });
-    });
+    const body = req.body || {};
+    const email = req.session.user.role === 'admin' ? normalizeEmail(body.email) : req.session.user.email;
+    if (!email) return res.status(400).json({ success: false, message: 'E-posta geçersiz.' });
+    const citizens = readJSON(USERS_FILE);
+    const index = citizens.findIndex(user => user.email === email);
+    const fields = ['lat', 'lng', 'lastActive', 'lastMoveAt', 'healthStatus', 'healthNote', 'battery', 'isSOS', 'isPanic'];
+    const update = Object.fromEntries(fields.filter(key => body[key] !== undefined).map(key => [key, body[key]]));
+    if (index < 0) citizens.push({ email, ...update });
+    else Object.assign(citizens[index], update);
+    writeJSON(USERS_FILE, citizens);
+    res.json({ success: true });
 });
 
-app.post('/api/verify-registration', (req, res) => {
-    const { email, code } = req.body;
-    const normalizedEmail = email ? email.trim().toLowerCase() : '';
-    if (!normalizedEmail || !code) return res.status(400).json({ success: false, message: "Email ve kod gereklidir!" });
-
-<<<<<<< HEAD
 app.post('/api/sos', (req, res) => {
     const list = readJSON(SOS_FILE);
-    list.push(req.body);
+    list.push({ ...(req.body || {}), user: req.session.user.email, time: new Date().toISOString() });
     writeJSON(SOS_FILE, list);
     res.json({ success: true });
-=======
-    db.get(`SELECT * FROM users WHERE email = ? AND verificationCode = ? AND verificationExpires > ?`, 
-        [normalizedEmail, code, Date.now()], (err, user) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!user) return res.status(400).json({ success: false, message: "Geçersiz kod veya süresi dolmuş!" });
-
-        db.run(`UPDATE users SET isVerified = 1, verificationCode = NULL, verificationExpires = NULL WHERE email = ?`, 
-            [normalizedEmail], function(err) {
-            if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-            
-            req.session.user = {
-                email: user.email,
-                role: 'citizen',
-                isVerified: true,
-                securityLevel: 'Yüksek',
-                loginTime: new Date().toISOString()
-            };
-            
-            return res.json({ 
-                success: true, 
-                message: "Hesabınız doğrulandı! Hoş geldiniz.",
-                isVerified: true,
-                securityLevel: 'Yüksek'
-            });
-        });
-    });
->>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
 });
+app.get('/api/sos', requireAdmin, (req, res) => res.json(readJSON(SOS_FILE)));
 
-app.post('/api/resend-verification-code', (req, res) => {
-    const { email } = req.body;
-    const normalizedEmail = email ? email.trim().toLowerCase() : '';
-    if (!normalizedEmail) return res.status(400).json({ success: false, message: "Email gereklidir!" });
-
-<<<<<<< HEAD
-app.post('/api/messages', (req, res) => {
-    const messages = readJSON(MESSAGES_FILE);
-    messages.push(req.body);
-    writeJSON(MESSAGES_FILE, messages);
-    res.json({ success: true });
-=======
-    db.get(`SELECT * FROM users WHERE email = ?`, [normalizedEmail], (err, user) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!user) return res.status(404).json({ success: false, message: "Bu email bulunamadı!" });
-        if (user.isVerified) return res.status(400).json({ success: false, message: "Bu hesap zaten doğrulanmış." });
-
-        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-        db.run(`UPDATE users SET verificationCode = ?, verificationExpires = ? WHERE email = ?`,
-            [verificationCode, Date.now() + 3600000, normalizedEmail], async function(err) {
-            if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-
-            const host = req.get('host') || `localhost:${PORT}`;
-            const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
-            const verifyLink = `${protocol}://${host}`;
-            const emailResult = await sendEmail(normalizedEmail, 'TR-GOZU Doğrulama Kodu Tekrar', `<p>Yeni doğrulama kodunuz: <b>${verificationCode}</b></p><p>Bu kod 1 saat geçerlidir.</p><p>Siteye dönmek için <a href="${verifyLink}">buraya tıklayın</a>.</p>`);
-            if (!emailResult.success) {
-                return res.status(500).json({ success: false, message: `Mail gönderilemedi: ${emailResult.error}` });
-            }
-            return res.json({ success: true, message: "Yeni doğrulama kodu gönderildi!" });
-        });
-    });
-});
-
-app.post('/api/reset-password', (req, res) => {
-    const { email, token, newPassword } = req.body;
-    const normalizedEmail = email ? email.trim().toLowerCase() : '';
-    if (!normalizedEmail || !token || !newPassword) {
-        return res.status(400).json({ success: false, message: "Email, kod ve yeni şifre gereklidir!" });
+app.post('/api/messages', async (req, res) => {
+    const body = req.body || {};
+    const recipient = typeof body.to === 'string' ? body.to : body.receiver;
+    const text = typeof body.message === 'string' ? body.message : '';
+    if (!recipient || !text || text.length > 4000) return res.status(400).json({ success: false, message: 'Mesaj geçersiz.' });
+    const sender = req.session.user.role === 'admin' ? 'ADMIN' : req.session.user.email;
+    try {
+        await runDatabase('INSERT INTO messages (sender, receiver, message, timestamp) VALUES (?, ?, ?, ?)', [sender, recipient, text, new Date().toISOString()]);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Mesaj kaydedilemedi.' });
     }
-
-    db.get(`SELECT * FROM users WHERE email = ? AND resetToken = ? AND resetExpires > ?`, 
-        [normalizedEmail, token, Date.now()], (err, user) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!user) return res.status(400).json({ success: false, message: "Geçersiz kod veya süresi dolmuş!" });
-        
-        db.run(`UPDATE users SET pass = ?, resetToken = NULL, resetExpires = NULL WHERE email = ?`, 
-            [newPassword, normalizedEmail], function(err) {
-            if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-            res.json({ success: true, message: "Şifre başarıyla güncellendi!" });
-        });
-    });
 });
 
-// Kullanıcı verilerini sunucudan yükle
-app.get('/api/load-user-data/:email', (req, res) => {
-    const email = decodeURIComponent(req.params.email);
-    db.get(`SELECT * FROM user_data WHERE email = ?`, [email], (err, row) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        if (!row) {
-            // Yeni kullanıcı, boş data oluştur
-            db.run(`INSERT INTO user_data (email, family, announcements, missingPersons, helpRequests, citizens, sosList, threads, chatMessages, lastUpdated) 
-                    VALUES (?, '[]', '[]', '[]', '[]', '[]', '[]', '[]', '[]', ?)`,
-                [email, new Date().toISOString()]);
-            return res.json({ success: true, data: {} });
-        }
-        res.json({ 
-            success: true, 
-            data: {
-                family: row.family ? JSON.parse(row.family) : [],
-                announcements: row.announcements ? JSON.parse(row.announcements) : [],
-                missingPersons: row.missingPersons ? JSON.parse(row.missingPersons) : [],
-                helpRequests: row.helpRequests ? JSON.parse(row.helpRequests) : [],
-                citizens: row.citizens ? JSON.parse(row.citizens) : [],
-                sosList: row.sosList ? JSON.parse(row.sosList) : [],
-                threads: row.threads ? JSON.parse(row.threads) : [],
-                chatMessages: row.chatMessages ? JSON.parse(row.chatMessages) : []
-            }
-        });
-    });
-});
-
-// Kullanıcı verilerini sunucuya kaydet
-app.post('/api/save-user-data', (req, res) => {
-    const { email, key, value } = req.body;
-    if (!email || !key) return res.status(400).json({ success: false, message: "Email ve key gereklidir!" });
-
-    db.get(`SELECT * FROM user_data WHERE email = ?`, [email], (err, row) => {
-        if (err) return res.status(500).json({ success: false, message: "Veritabanı hatası!" });
-        
-        const data = row || {
-            email,
-            family: '[]',
-            announcements: '[]',
-            missingPersons: '[]',
-            helpRequests: '[]',
-            citizens: '[]',
-            sosList: '[]',
-            threads: '[]',
-            chatMessages: '[]'
-        };
-
-        // Güncellenecek alanı ayarla
-        if (key === 'family') data.family = JSON.stringify(value);
-        else if (key === 'announcements') data.announcements = JSON.stringify(value);
-        else if (key === 'missingPersons') data.missingPersons = JSON.stringify(value);
-        else if (key === 'helpRequests') data.helpRequests = JSON.stringify(value);
-        else if (key === 'citizens') data.citizens = JSON.stringify(value);
-        else if (key === 'sosList') data.sosList = JSON.stringify(value);
-        else if (key === 'threads') data.threads = JSON.stringify(value);
-        else if (key === 'chatMessages') data.chatMessages = JSON.stringify(value);
-
-        data.lastUpdated = new Date().toISOString();
-
-        if (row) {
-            db.run(`UPDATE user_data SET family=?, announcements=?, missingPersons=?, helpRequests=?, citizens=?, sosList=?, threads=?, chatMessages=?, lastUpdated=? WHERE email=?`,
-                [data.family, data.announcements, data.missingPersons, data.helpRequests, data.citizens, data.sosList, data.threads, data.chatMessages, data.lastUpdated, email],
-                function(err) {
-                    if (err) return res.status(500).json({ success: false, message: "Güncelleme hatası!" });
-                    res.json({ success: true, message: "Veri kaydedildi." });
-                }
-            );
-        } else {
-            db.run(`INSERT INTO user_data (email, family, announcements, missingPersons, helpRequests, citizens, sosList, threads, chatMessages, lastUpdated) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [email, data.family, data.announcements, data.missingPersons, data.helpRequests, data.citizens, data.sosList, data.threads, data.chatMessages, data.lastUpdated],
-                function(err) {
-                    if (err) return res.status(500).json({ success: false, message: "Kayıt hatası!" });
-                    res.json({ success: true, message: "Veri kaydedildi." });
-                }
-            );
-        }
-    });
->>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
-});
-
-app.get('/api/messages/:userId', (req, res) => {
-    const messages = readJSON(MESSAGES_FILE);
-    const userId = decodeURIComponent(req.params.userId);
-<<<<<<< HEAD
-    res.json(messages.filter(message => message.from === userId || message.to === userId));
+app.get('/api/messages/:userId', async (req, res) => {
+    const requestedUser = decodeURIComponent(req.params.userId);
+    const userId = req.session.user.role === 'admin' ? requestedUser : req.session.user.email;
+    if (req.session.user.role !== 'admin' && requestedUser !== userId) {
+        return res.status(403).json({ success: false, message: 'Bu mesajlara erişim yetkiniz yok.' });
+    }
+    try {
+        const messages = await allDatabase('SELECT sender AS from, receiver AS to, message, timestamp AS time FROM messages WHERE sender = ? OR receiver = ?', [userId, userId]);
+        res.json(messages);
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Mesajlar yüklenemedi.' });
+    }
 });
 
 app.post('/api/volunteers', (req, res) => {
     const volunteers = readJSON(VOLUNTEERS_FILE);
-    volunteers.push(req.body);
+    volunteers.push({ ...(req.body || {}), email: req.session.user.email });
     writeJSON(VOLUNTEERS_FILE, volunteers);
     res.json({ success: true });
 });
+app.get('/api/volunteers', requireAdmin, (req, res) => res.json(readJSON(VOLUNTEERS_FILE)));
 
-app.get('/api/volunteers', (req, res) => res.json(readJSON(VOLUNTEERS_FILE)));
+const USER_DATA_FIELDS = ['family', 'announcements', 'missingPersons', 'helpRequests', 'citizens', 'sosList', 'threads', 'chatMessages'];
+app.get('/api/load-user-data/:email', async (req, res) => {
+    const email = normalizeEmail(decodeURIComponent(req.params.email));
+    if (email !== req.session.user.email && req.session.user.role !== 'admin') {
+        return res.status(403).json({ success: false, message: 'Bu verilere erişim yetkiniz yok.' });
+    }
+    try {
+        const row = await withDatabase('SELECT * FROM user_data WHERE email = ?', [email]);
+        if (!row) return res.json({ success: true, data: {} });
+        const data = {};
+        for (const field of USER_DATA_FIELDS) data[field] = row[field] ? JSON.parse(row[field]) : [];
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Kullanıcı verileri yüklenemedi.' });
+    }
+});
+
+app.post('/api/save-user-data', async (req, res) => {
+    const body = req.body || {};
+    const email = req.session.user.email;
+    const field = body.key === `chat_${email}` ? 'chatMessages' : body.key;
+    if (req.session.user.role !== 'admin' && normalizeEmail(body.email) !== email) {
+        return res.status(403).json({ success: false, message: 'Bu verileri değiştirme yetkiniz yok.' });
+    }
+    if (!USER_DATA_FIELDS.includes(field)) return res.status(400).json({ success: false, message: 'Veri alanı geçersiz.' });
+    const serialized = JSON.stringify(body.value);
+    if (serialized.length > 100000) return res.status(413).json({ success: false, message: 'Veri boyutu sınırı aşıldı.' });
+    try {
+        const row = await withDatabase('SELECT email FROM user_data WHERE email = ?', [email]);
+        if (!row) {
+            const initial = Object.fromEntries(USER_DATA_FIELDS.map(key => [key, '[]']));
+            initial[field] = serialized;
+            const columns = USER_DATA_FIELDS.join(',');
+            const placeholders = USER_DATA_FIELDS.map(() => '?').join(',');
+            await runDatabase(`INSERT INTO user_data (email, ${columns}, lastUpdated) VALUES (?, ${placeholders}, ?)`, [email, ...USER_DATA_FIELDS.map(key => initial[key]), new Date().toISOString()]);
+        } else {
+            await runDatabase(`UPDATE user_data SET ${field} = ?, lastUpdated = ? WHERE email = ?`, [serialized, new Date().toISOString(), email]);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Kullanıcı verileri kaydedilemedi.' });
+    }
+});
 
 app.use((req, res, next) => {
-    if (/\.(?:json|env|lock)$/i.test(req.path)) return res.sendStatus(404);
+    if (/\.(?:json|env|db|sqlite|session|lock)$/i.test(req.path)) return res.sendStatus(404);
     next();
 });
+
 app.get('/', (req, res) => res.sendFile(path.join(ROOT, 'index.html')));
 app.use('/css', express.static(path.join(ROOT, 'css')));
 app.use('/js', express.static(path.join(ROOT, 'js')));
 app.use('/assets', express.static(path.join(ROOT, 'assets')));
 app.use((req, res) => res.sendStatus(404));
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`TR-GOZU ${port} portunda aktif.`));
-=======
-    res.json(msgs.filter(m => m.sender === userId || m.receiver === userId || m.receiver === 'ADMIN'));
-});
-
-// SUNUCUYU BAŞLAT
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Sunucu ${PORT} portunda tam yetkiyle aktif!`);
-});
->>>>>>> 1133934dd4a11d70d65700a33dea7c1f2654970d
+app.listen(PORT, '0.0.0.0', () => console.log(`TR-GOZU server listening on ${PORT}.`));

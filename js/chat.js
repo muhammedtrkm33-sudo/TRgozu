@@ -27,7 +27,7 @@ function toggleChat() {
 function getChatHistory() {
     const email = getCurrentUserEmail();
     if (!email) return [];
-    return getFromStorage(`chat_${email}`, []);
+    return getFromStorage(`chat_${email}`, getFromStorage('chatMessages', []));
 }
 
 // Sohbet geçmişini kaydet
