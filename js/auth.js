@@ -63,6 +63,12 @@ async function valideKayit() {
             setCurrentUserEmail(email);
             showToast(data.message);
             showVerifyModal();
+        } else if (res.status === 503) {
+            STATE.userRole = 'citizen';
+            tempUserData = { email };
+            setCurrentUserEmail(email);
+            showVerifyModal();
+            document.getElementById('verifyStatus').textContent = `${data.message} SMTP ayarları düzeltildikten sonra kodu tekrar gönderin.`;
         } else {
             showToast(data.message);
         }
