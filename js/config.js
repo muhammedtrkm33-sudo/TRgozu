@@ -3,6 +3,7 @@ const CONFIG = {
     // Eşik Değerleri
     BATTERY_THRESHOLD: 10,
     SOS_COUNTDOWN: 5,
+    SOS_COOLDOWN_SECONDS: 120,
     PANIC_PRESS_INTERVAL: 2000,
     PANIC_PRESS_COUNT: 3,
 
@@ -128,6 +129,8 @@ const STATE = {
     userRole: null,
     tempUserData: null,
     userEmail: null,
+    isVerified: false,
+    securityLevel: 'Düşük',
     currentLocation: null,
     isLocationActive: false,
     sosCount: 0,
@@ -200,5 +203,48 @@ function getCurrentUserEmail() {
 function setCurrentUserEmail(email) {
     STATE.userEmail = email;
     localStorage.setItem('currentUserEmail', email);
+    
+    // Sidebarı güncelle
+    const displayUser = document.getElementById('displayUser');
+    const roleBadge = document.getElementById('roleBadge');
+    const securityBadge = document.getElementById('securityBadge');
+    
+    if (displayUser) {
+        displayUser.textContent = email.split('@')[0] || 'Kullanıcı';
+    }
+    if (roleBadge) {
+        roleBadge.textContent = STATE.userRole === 'admin' ? 'YETKİLİ' : 'VATANDAŞ';
+    }
+    if (securityBadge) {
+        securityBadge.textContent = `Güvenlik: ${STATE.securityLevel}`;
+        securityBadge.className = 'badge ' + (STATE.isVerified ? 'security-high' : 'security-low');
+    }
+}
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    if (sidebar && overlay) {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('show');
+    }
+}
+
+async function logout() {
+    if (confirm('Çıkış yapmak istiyor musunuz?')) {
+        try {
+            const res = await fetch('/logout', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                showToast('Çıkış başarılı');
+            }
+        } catch (e) {
+            console.log('Logout request failed');
+        }
+        // Otomatik giriş verisini temizle
+        localStorage.removeItem('autoLogin');
+        // Session temizlendikten sonra sayfayı yenile
+        setTimeout(() => location.reload(), 500);
+    }
 }
 
