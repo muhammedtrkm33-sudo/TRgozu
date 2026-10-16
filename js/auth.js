@@ -1,13 +1,11 @@
 // TR-GOZU Kimlik Doğrulama Modülü
 
-const ADMIN_KEYS = {
-    "AFAD2026": "AFAD Komuta Merkezi",
-    "UMKE911": "UMKE Acil Müdahale",
-    "AKUT123": "AKUT Operasyon",
-    "ADMIN": "Sistem Yöneticisi"
-};
-
 let tempUserData = null;
+
+for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+    const key = localStorage.key(index);
+    if (key && key.startsWith('user_')) localStorage.removeItem(key);
+}
 
 // Giriş türünü değiştir
 function switchAuth(type) {
@@ -127,8 +125,31 @@ function initSystem() {
     showToast(`${STATE.userRole === 'admin' ? 'Yetkili' : 'Vatandaş'} olarak hoş geldiniz!`);
 }
 
+async function authenticateCitizen(mode, email, password) {
+    try {
+        const response = await fetch('/api/auth/citizen', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode, email, password })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            showToast(result.message || 'Giriş başarısız.');
+            return;
+        }
+
+        STATE.userRole = 'citizen';
+        tempUserData = { email };
+        setCurrentUserEmail(email);
+        updateCitizen(email, { lastActive: new Date().toISOString() });
+        showContract();
+    } catch (error) {
+        showToast('Güvenli giriş için siteyi sunucu üzerinden açın.');
+    }
+}
+
 // Kayıt ol
-function valideKayit() {
+async function valideKayit() {
     const email = document.getElementById('c_user').value.trim().toLowerCase();
     const pass = document.getElementById('c_pass').value;
 
@@ -149,37 +170,16 @@ function valideKayit() {
     }
 
     // Şifre doğrulama
-    if (pass.length < 4) {
-        showToast('Şifre en az 4 karakter olmalıdır!');
+    if (pass.length < 8) {
+        showToast('Şifre en az 8 karakter olmalıdır!');
         return;
     }
 
-    // Kayıt kontrolü
-    const existingPass = localStorage.getItem("user_" + email);
-    if (existingPass) {
-        showToast('Bu e-posta zaten kayıtlı! Giriş yapın.');
-        return;
-    }
-
-    // Kayıt işlemi
-    localStorage.setItem("user_" + email, pass);
-
-    // Vatandaş verisini oluştur
-    updateCitizen(email, {
-        lastActive: new Date().toISOString(),
-        registeredAt: new Date().toISOString()
-    });
-
-    // Giriş yap
-    STATE.userRole = 'citizen';
-    tempUserData = { email };
-    setCurrentUserEmail(email);
-
-    showContract();
+    await authenticateCitizen('register', email, pass);
 }
 
 // Giriş yap
-function valideGiris() {
+async function valideGiris() {
     const email = document.getElementById('c_user').value.trim().toLowerCase();
     const pass = document.getElementById('c_pass').value;
 
@@ -201,27 +201,7 @@ function valideGiris() {
         return;
     }
 
-    // Şifre kontrolü
-    const kayitliSifre = localStorage.getItem("user_" + email);
-    if (!kayitliSifre) {
-        showToast('Kayıtlı kullanıcı bulunamadı! Önce kayıt olun.');
-        return;
-    }
-
-    if (kayitliSifre !== pass) {
-        showToast('Şifre hatalı!');
-        return;
-    }
-
-    // Giriş işlemi
-    STATE.userRole = 'citizen';
-    tempUserData = { email };
-    setCurrentUserEmail(email);
-
-    // Son aktifliği güncelle
-    updateCitizen(email, { lastActive: new Date().toISOString() });
-
-    showContract();
+    await authenticateCitizen('login', email, pass);
 }
 
 // Enter ile giriş / şifre alanına yönlendirme
@@ -282,21 +262,29 @@ function onAuthSectionEnter(e) {
 
 document.addEventListener('DOMContentLoaded', initAuthEnterSubmit);
 
-// Yetkili girişi (yerel)
-function handleAdminGirisLocal() {
+// Yetkili girişi sunucu tarafından doğrulanır
+async function handleAdminGirisLocal() {
     const key = document.getElementById('admin_key').value.trim();
-    const unit = ADMIN_KEYS[key];
-
-    if (unit) {
+    try {
+        const response = await fetch('/api/auth/admin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            showToast(result.message || 'Yetkili girişi başarısız.');
+            return;
+        }
         STATE.userRole = 'admin';
         tempUserData = {
             email: 'YETKILI@ADMIN',
-            unit: unit,
-            tc: unit
+            unit: result.unit,
+            tc: result.unit
         };
         showContract();
-    } else {
-        showToast('Hatalı Yetkili Anahtarı!');
+    } catch (error) {
+        showToast('Yetkili girişi için siteyi sunucu üzerinden açın.');
     }
 }
 
@@ -354,6 +342,7 @@ function toggleSidebar() {
 // Çıkış yap
 function logout() {
     if (confirm('Çıkış yapmak istediğinize emin misiniz?')) {
+        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
         // Temizlik
         STATE.userRole = null;
         tempUserData = null;
