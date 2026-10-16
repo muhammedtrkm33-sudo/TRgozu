@@ -83,45 +83,49 @@ async function sendChatMessage() {
     const typingEl = document.getElementById('chatTyping');
     if (typingEl) typingEl.classList.remove('hidden');
 
+    if (isDisallowedTopic(text)) {
+        if (typingEl) typingEl.classList.add('hidden');
+        addChatMessage(generateAIResponse(text), 'bot');
+        return;
+    }
+
     const proxyUrl =
         typeof CONFIG !== 'undefined' && CONFIG.AI_CHAT_PROXY_URL
             ? String(CONFIG.AI_CHAT_PROXY_URL).trim()
-            : '';
+            : '/api/chat';
 
-    if (proxyUrl) {
-        try {
-            const history = getChatHistory()
-                .filter((m) => m.type === 'user' || m.type === 'bot')
-                .slice(-12)
-                .map((m) => ({
-                    role: m.type === 'user' ? 'user' : 'assistant',
-                    content: m.text
-                }));
-            const res = await fetch(proxyUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, messages: history })
-            });
-            const data = res.ok ? await res.json().catch(() => null) : null;
-            const reply =
-                data &&
-                (data.reply || data.message || data.content || data.text);
-            if (reply && String(reply).trim()) {
-                if (typingEl) typingEl.classList.add('hidden');
-                addChatMessage(String(reply).trim(), 'bot');
-                return;
-            }
-        } catch (e) {
-            console.warn('AI proxy:', e);
+    try {
+        const history = getChatHistory()
+            .filter((message) => message.type === 'user' || message.type === 'bot')
+            .slice(-12)
+            .map((message) => ({
+                role: message.type === 'user' ? 'user' : 'assistant',
+                content: message.text
+            }));
+        const response = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, messages: history }),
+            signal: AbortSignal.timeout(30000)
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+            const error = new Error(data?.error || 'AI isteği başarısız oldu.');
+            error.status = response.status;
+            throw error;
         }
-    }
-
-    const delay = 600 + Math.random() * 800;
-    setTimeout(() => {
+        const reply = data && (data.reply || data.message || data.content || data.text);
+        if (!reply || !String(reply).trim()) throw new Error('AI boş yanıt verdi.');
+        addChatMessage(String(reply).trim(), 'bot');
+    } catch (error) {
+        console.warn('AI proxy:', error);
+        const message = error.status === 503
+            ? 'Gerçek AI henüz sunucuda yapılandırılmamış. Render ortam değişkenlerine AI_API_KEY ekleyin.'
+            : 'Gerçek AI yanıt veremedi. Bağlantıyı kontrol edip tekrar deneyin.';
+        addChatMessage(message, 'bot');
+    } finally {
         if (typingEl) typingEl.classList.add('hidden');
-        const response = generateAIResponse(text);
-        addChatMessage(response, 'bot');
-    }, delay);
+    }
 }
 
 // Enter tuşu ile gönder
