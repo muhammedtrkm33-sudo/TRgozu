@@ -169,7 +169,10 @@ function allowRequest(limits, key, maximum, res) {
 }
 
 function allowLogin(req, res) {
-    return allowRequest(loginAttempts, req.ip, 10, res);
+    const action = req.path === '/save-user'
+        ? `${req.path}:${req.body?.mode || 'unknown'}`
+        : req.path;
+    return allowRequest(loginAttempts, `${req.ip}:${action}`, 10, res);
 }
 
 function requireAuth(req, res, next) {
