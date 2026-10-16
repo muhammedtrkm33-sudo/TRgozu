@@ -40,9 +40,8 @@ const CONFIG = {
     // Google Directions: tarayıcıdan CORS yok; üretimde kendi backend proxy kullanın. Boş = yalnız OSRM.
     GOOGLE_DIRECTIONS_API_KEY: '',
 
-    // Gerçek LLM: API anahtarını tarayıcıya koymayın. Kendi sunucunuzda POST proxy (ör. OpenAI uyumlu) tanımlayın.
-    // İstek gövdesi: { "messages": [...], "message": "son kullanıcı metni" } — yanıt: { "reply": "..." }
-    AI_CHAT_PROXY_URL: '',
+    // Gerçek AI, API anahtarını sunucuda tutan aynı-origin proxy üzerinden çalışır.
+    AI_CHAT_PROXY_URL: '/api/chat',
 
     // Öncelik Eşikleri
     PRIORITY_THRESHOLDS: {
