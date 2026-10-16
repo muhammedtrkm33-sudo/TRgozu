@@ -53,6 +53,7 @@ ehthumbs.db
 
 # TR-GOZU specific
 trgozu.db
+.data/
 users.json
 messages.json
 yetkili.json
