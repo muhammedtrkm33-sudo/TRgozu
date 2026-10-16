@@ -8,3 +8,5 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.17.0
+      - key: SESSION_SECRET
+        generateValue: true
