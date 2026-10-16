@@ -16,9 +16,8 @@ async function fetchAndShowAirQuality(lat, lng) {
     }
 
     try {
-        const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lng}&appid=${CONFIG.WEATHER_API_KEY}`
-        );
+        const coordinates = new URLSearchParams({ lat: String(lat), lon: String(lng) });
+        const response = await fetch(`/api/weather/air-pollution?${coordinates}`);
 
         if (!response.ok) throw new Error(`Air quality ${response.status}`);
         const data = await response.json();
