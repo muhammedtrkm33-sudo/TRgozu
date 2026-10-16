@@ -10,9 +10,8 @@ async function showMapClickWeatherPopup(lat, lng) {
         .openOn(window.map);
 
     const weatherP = fetchWeatherData(lat, lng);
-    const airP = fetch(
-        `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lng}&appid=${CONFIG.WEATHER_API_KEY}`
-    )
+    const coordinates = new URLSearchParams({ lat: String(lat), lon: String(lng) });
+    const airP = fetch(`/api/weather/air-pollution?${coordinates}`)
         .then(r => (r.ok ? r.json() : null))
         .catch(() => null);
 
@@ -74,9 +73,8 @@ async function showMapClickWeatherPopup(lat, lng) {
 // OpenWeatherMap — anlık hava (Current Weather API, metric + tr)
 async function fetchWeatherData(lat, lng) {
     try {
-        const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${CONFIG.WEATHER_API_KEY}&units=metric&lang=tr`
-        );
+        const coordinates = new URLSearchParams({ lat: String(lat), lon: String(lng) });
+        const response = await fetch(`/api/weather/current?${coordinates}`);
         if (!response.ok) throw new Error('Weather API error');
         const data = await response.json();
         STATE.lastWeatherData = data;
@@ -90,9 +88,8 @@ async function fetchWeatherData(lat, lng) {
 // OpenWeatherMap 5 günlük tahmin
 async function fetchWeatherForecast(lat, lng) {
     try {
-        const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lng}&appid=${CONFIG.WEATHER_API_KEY}&units=metric&lang=tr&cnt=16`
-        );
+        const coordinates = new URLSearchParams({ lat: String(lat), lon: String(lng) });
+        const response = await fetch(`/api/weather/forecast?${coordinates}`);
         if (!response.ok) throw new Error('Forecast API error');
         return await response.json();
     } catch (error) {
