@@ -1,8 +1,5 @@
 // TR-GOZU Konfigürasyon
 const CONFIG = {
-    // Hava: OpenWeatherMap Current Weather + Forecast + Air Pollution (resmi, güncel grid verisi)
-    WEATHER_API_KEY: '7772c5d94deed2dac920936fe962bfc0',
-
     // Eşik Değerleri
     BATTERY_THRESHOLD: 10,
     SOS_COUNTDOWN: 5,
